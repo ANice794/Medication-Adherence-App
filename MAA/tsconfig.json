@@ -1,7 +1,11 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "target": "ES6",
+    "module": "CommonJS",
     "strict": true,
+    "esModuleInterop": true,
+    "outDir": "./dist",
     "paths": {
       "@/*": [
         "./*"
@@ -12,6 +16,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+    "expo-env.d.ts",
+    "src"
+, "server.js"  ]
 }
