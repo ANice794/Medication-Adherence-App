@@ -3,8 +3,6 @@ const express = require('express');
 const app = express();
 
 app.use(express.json()); // Only JSON parsing middleware
-app.use("/doctors", doctorRouter);
-
 
 app.use("/doctors", doctorRouter);
 
