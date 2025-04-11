@@ -1,4 +1,7 @@
 const client = require('./db-conn');
+const bcrypt = require('bcrypt');
+const saltRounds = 10; // Number of rounds for bcrypt hashing
+const jwt = require('jsonwebtoken');
 
 const createDoctor = async (newDoctor) => {
     newDoctor[6] = 'doctor'; // Set the role to 'doctor'
