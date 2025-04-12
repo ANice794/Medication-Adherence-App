@@ -15,7 +15,8 @@ client.connect()
     .then(() => {
         console.log('Connected to PostgreSQL database');
         // Test query to ensure the connection works
-        return client.query('SELECT NOW()');
+        return client.query('SELECT NOW() + interval \'3 day\' AS "current_time_plus_3_days"');
+
     })
     .then(result => console.log('Database test query result:', result.rows[0]))
     .catch(err => {

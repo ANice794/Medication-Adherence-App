@@ -13,5 +13,12 @@ router.get("/messages/:patientId", controller.getAllMessages);
 router.get("/user/:patientId/chats/:chatId", controller.getAllMessagesForOneChat);
 router.post("/chats/doctor/:doctorId/patient/:patientId", controller.createNewChat);
 router.get("/doctor/:patientId", controller.getAllDoctorsForOnePatient);
+router.post("/:patientId/rewards/:rewardId", controller.addRewardToPatient);
+router.get("/rewards/:patientId", controller.getAllRewardsForOnePatient);
+router.get("/:patientId/points/current", controller.getCurrentPointsForPatient);
+router.get("/:patientId/points/all", controller.getAllPointsForPatient);
+router.post("/:patientId/points", controller.addPointsToPatient);
+
+
 
 module.exports = router;

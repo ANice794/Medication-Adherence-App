@@ -18,7 +18,10 @@ const addPatient = async (req, res, next) => {
     }
     let newPatient = [first_name, last_name, email, password, profile_picture, dob];
     try {
-        res.json(await model.createPatient(newPatient));
+        
+        let theNewPatient = await model.createPatient(newPatient);
+        await model.addPointsToPatient([theNewPatient.id]);
+        res.json(theNewPatient);
     } catch (error) {
         console.error('Error adding doctor:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -37,7 +40,7 @@ const getPatients = async (req, res) => {
 
 const getOnePatient = async (req, res) => {
     let patientId = req.params.patientId;
-    
+
     if (!patientId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -54,7 +57,7 @@ const getOnePatient = async (req, res) => {
 const updatePatient = async (req, res) => {
     let patientId = req.params.patientId;
     let updatedData = req.body;
-    
+
     if (!patientId || !updatedData) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -70,7 +73,7 @@ const updatePatient = async (req, res) => {
 
 const deletePatient = async (req, res) => {
     let patientId = req.params.patientId;
-    
+
     if (!patientId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -86,7 +89,7 @@ const deletePatient = async (req, res) => {
 
 const getAllChats = async (req, res) => {
     let patientId = req.params.patientId;
-    
+
     if (!patientId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -102,7 +105,7 @@ const getAllChats = async (req, res) => {
 
 const getAllMessages = async (req, res) => {
     let patientId = req.params.patientId;
-    
+
     if (!patientId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -119,7 +122,7 @@ const getAllMessages = async (req, res) => {
 const getAllMessagesForOneChat = async (req, res) => {
     let patientId = req.params.patientId;
     let chatId = req.params.chatId;
-    
+
     if (!patientId || !chatId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -136,7 +139,7 @@ const getAllMessagesForOneChat = async (req, res) => {
 const createNewChat = async (req, res) => {
     let doctorId = req.params.doctorId;
     let patientId = req.params.patientId;
-    
+
     if (!doctorId || !patientId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -152,7 +155,7 @@ const createNewChat = async (req, res) => {
 
 const getAllDoctorsForOnePatient = async (req, res) => {
     let patientId = req.params.patientId;
-    
+
     if (!patientId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -162,6 +165,116 @@ const getAllDoctorsForOnePatient = async (req, res) => {
         res.json(doctors);
     } catch (error) {
         console.error('Error fetching doctors for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const addRewardToPatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let rewardId = req.params.rewardId;
+
+    if (!patientId || !rewardId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedPatient = await model.addRewardToPatient(patientId, rewardId);
+        const reward = await model.getReward(rewardId);
+        await(model.removePointsFromPatient(reward.points, patientId));
+        res.json(updatedPatient);
+    } catch (error) {
+        console.error('Error adding reward to patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const removeRewardFromPatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let rewardId = req.params.rewardId;
+
+    if (!patientId || !rewardId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedPatient = await model.removeRewardFromPatient(patientId, rewardId);
+        res.json(updatedPatient);
+    } catch (error) {
+        console.error('Error removing reward from patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAllRewardsForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const rewards = await model.getAllRewardsForOnePatient(patientId);
+        const goodRewards = [];
+        for (let i = 0; i < rewards.length; i++) {
+            console.log(rewards[i].expiration_date);
+            if (rewards[i].expiration_date > Date.now()) {
+                goodRewards.push(rewards[i]);
+            } else {
+                await model.removeRewardFromPatient(patientId, rewards[i].reward_id);
+            }
+        }
+        res.json(goodRewards);
+    } catch (error) {
+        console.error('Error fetching rewards for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getCurrentPointsForPatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const points = await model.getCurrentPointsForPatient(patientId);
+        res.json(points);
+    } catch (error) {
+        console.error('Error fetching points for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAllPointsForPatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const points = await model.getAllPointsForPatient(patientId);
+        res.json(points);
+    } catch (error) {
+        console.error('Error fetching points for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const addPointsToPatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let points = 10; // Default points to add
+
+    if (!patientId || !points) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedPatient = await model.addPointsToPatient(patientId, points);
+        res.json(updatedPatient);
+    } catch (error) {
+        console.error('Error adding points to patient:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -176,5 +289,11 @@ module.exports = {
     getAllMessages,
     getAllMessagesForOneChat,
     createNewChat,
-    getAllDoctorsForOnePatient
+    getAllDoctorsForOnePatient,
+    addRewardToPatient,
+    removeRewardFromPatient,
+    getAllRewardsForOnePatient,
+    getCurrentPointsForPatient,
+    getAllPointsForPatient,
+    addPointsToPatient,
 };

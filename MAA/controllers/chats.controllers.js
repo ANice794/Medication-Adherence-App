@@ -51,8 +51,144 @@ const getAllMessages = async (req, res) => {
     }
 };
 
+const createNewMessage = async (req, res) => {
+    const chatId = req.params.chatId;
+    //chat_id, sender_id, receiver_id, content, sent_at, is_read, status, parent_message_id
+    const sender_id = req.body.sender_id;
+    const receiver_id = req.body.receiver_id;
+    const content = req.body.content;
+    const is_read = req.body.is_read;
+    const status = req.body.status;
+    const parent_message_id = req.body.parent_message_id;
+    
+
+    // Validate input data
+    if (!chatId || !sender_id || !receiver_id || !content || !is_read || !status) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const message = [chatId, sender_id, receiver_id, content, is_read, status, parent_message_id];
+        const newMessage = await model.createNewMessage(message);
+        res.status(201).json(newMessage);
+    } catch (error) {
+        console.error('Error creating new message:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const deleteMessage = async (req, res) => {
+    const { messageId } = req.params;
+
+    // Validate input data
+    if (!messageId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        await model.deleteMessage(messageId);
+        res.status(204).send(); // No content to send back
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const softDeleteMessage = async (req, res) => {
+    const { messageId } = req.params;
+
+    // Validate input data
+    if (!messageId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        await model.softDeleteMessage(messageId);
+        res.status(204).send(); // No content to send back
+    } catch (error) {
+        console.error('Error soft-deleting message:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const editMessage = async (req, res) => {
+    const messageId  = req.params.messageId;
+    const newContent = req.body.content;
+
+    // Validate input data
+    if (!messageId || !newContent) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedMessage = await model.editMessage(messageId, newContent);
+        res.status(200).json(updatedMessage);
+    } catch (error) {
+        console.error('Error editing message:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const markAsRead = async (req, res) => {
+    const { messageId } = req.params;
+
+    // Validate input data
+    if (!messageId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        await model.markAsRead(messageId);
+        res.status(204).send(); // No content to send back
+    } catch (error) {
+        console.error('Error marking message as read:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAllUnreadMessages = async (req, res) => {
+    const { userId } = req.params;
+
+    // Validate input data
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const unreadMessages = await model.getAllUnreadMessages(userId);
+        res.status(200).json(unreadMessages);
+    } catch (error) {
+        console.error('Error fetching unread messages:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAllReadMessages = async (req, res) => {
+    const { userId } = req.params;
+
+    // Validate input data
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const readMessages = await model.getAllReadMessages(userId);
+        res.status(200).json(readMessages);
+    } catch (error) {
+        console.error('Error fetching read messages:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     createNewChat,
     getAllChats,
-    getAllMessages
+    getAllMessages,
+    createNewMessage,
+    deleteMessage,
+    softDeleteMessage,
+    editMessage,
+    markAsRead,
+    getAllUnreadMessages,
+    getAllReadMessages,
 };
