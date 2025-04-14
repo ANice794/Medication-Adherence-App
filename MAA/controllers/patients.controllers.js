@@ -18,7 +18,7 @@ const addPatient = async (req, res, next) => {
     }
     let newPatient = [first_name, last_name, email, password, profile_picture, dob];
     try {
-        
+
         let theNewPatient = await model.createPatient(newPatient);
         await model.addPointsToPatient([theNewPatient.id]);
         res.json(theNewPatient);
@@ -180,7 +180,7 @@ const addRewardToPatient = async (req, res) => {
     try {
         const updatedPatient = await model.addRewardToPatient(patientId, rewardId);
         const reward = await model.getReward(rewardId);
-        await(model.removePointsFromPatient(reward.points, patientId));
+        await (model.removePointsFromPatient(reward.points, patientId));
         res.json(updatedPatient);
     } catch (error) {
         console.error('Error adding reward to patient:', error);
@@ -279,6 +279,201 @@ const addPointsToPatient = async (req, res) => {
     }
 };
 
+const addReminder = async (req, res) => {
+    let user_id = req.params.patientId;
+    let medication_name = req.body.medication_name;
+    let dosage = req.body.dosage;
+    let schedule_time = req.body.schedule_time;
+    let frequency = req.body.frequency;
+    let start_date = req.body.start_date;
+    let end_date = req.body.end_date;
+
+    if (!user_id || !medication_name || !dosage || !schedule_time || !frequency || !start_date || !end_date) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    let newReminder = [user_id, medication_name, dosage, schedule_time, frequency, start_date, end_date];
+    try {
+        const updatedPatient = await model.addReminderToPatient(newReminder);
+        res.json(updatedPatient);
+    } catch (error) {
+        console.error('Error adding reminder to patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAllRemindersForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const reminders = await model.getAllRemindersForOnePatient(patientId);
+        res.json(reminders);
+    } catch (error) {
+        console.error('Error fetching reminders for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const updateReminderForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let reminderId = req.params.reminderId;
+    let updatedData = req.body;
+
+    if (!patientId || !reminderId || !updatedData) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedReminder = await model.updateReminderForOnePatient(patientId, reminderId, updatedData);
+        res.json(updatedReminder);
+    } catch (error) {
+        console.error('Error updating reminder for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const deleteReminderForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let reminderId = req.params.reminderId;
+
+    if (!patientId || !reminderId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const deletedReminder = await model.deleteReminderForOnePatient(patientId, reminderId);
+        res.json(deletedReminder);
+    } catch (error) {
+        console.error('Error deleting reminder for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getOneReminderForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let reminderId = req.params.reminderId;
+
+    if (!patientId || !reminderId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const reminder = await model.getOneReminderForOnePatient(patientId, reminderId);
+        res.json(reminder);
+    } catch (error) {
+        console.error('Error fetching reminder for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAdherenceForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const adherence = await model.getAdherenceForOnePatient(patientId);
+        res.json(adherence);
+    } catch (error) {
+        console.error('Error fetching adherence for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const addAdherenceForOnePatient = async (req, res) => {
+    let user_id = req.params.patientId;
+    let reminder_id = req.params.reminderId;
+    let schedule_for = req.body.schedule_for;
+    let points_rewarded = req.body.points_rewarded;
+    try {
+
+        if (!user_id || !reminder_id || !schedule_for || !points_rewarded) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const updatedAdherence = await model.addAdherenceForOnePatient(patientId, medicationId, adherence);
+        res.json(updatedAdherence);
+    } catch (error) {
+        console.error('Error adding adherence for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const updateAdherenceForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let adherenceId = req.params.adherenceId;
+    let updatedData = req.body;
+
+    if (!patientId || !adherenceId || !updatedData) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedAdherence = await model.updateAdherenceForOnePatient(patientId, adherenceId, updatedData);
+        res.json(updatedAdherence);
+    } catch (error) {
+        console.error('Error updating adherence for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const deleteAdherenceForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let adherenceId = req.params.adherenceId;
+
+    if (!patientId || !adherenceId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const deletedAdherence = await model.deleteAdherenceForOnePatient(patientId, adherenceId);
+        res.json(deletedAdherence);
+    } catch (error) {
+        console.error('Error deleting adherence for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getOneAdherenceForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let adherenceId = req.params.adherenceId;
+
+    if (!patientId || !adherenceId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+        const adherence = await model.getOneAdherenceForOnePatient(patientId, adherenceId);
+        res.json(adherence);
+    } catch (error) {
+        console.error('Error fetching adherence for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAdherenceForOneReminderForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let reminderId = req.params.reminderId;
+
+    if (!patientId || !reminderId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const adherence = await model.getAdherenceForOneReminderForOnePatient(patientId, reminderId);
+        res.json(adherence);
+    } catch (error) {
+        console.error('Error fetching adherence for reminder for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     addPatient,
     getPatients,
@@ -296,4 +491,15 @@ module.exports = {
     getCurrentPointsForPatient,
     getAllPointsForPatient,
     addPointsToPatient,
+    addReminder,
+    getAllRemindersForOnePatient,
+    updateReminderForOnePatient,
+    deleteReminderForOnePatient,
+    getOneReminderForOnePatient,
+    getAdherenceForOnePatient,
+    addAdherenceForOnePatient,
+    updateAdherenceForOnePatient,
+    deleteAdherenceForOnePatient,
+    getOneAdherenceForOnePatient,
+    getAdherenceForOneReminderForOnePatient,
 };

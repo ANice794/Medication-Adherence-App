@@ -16,7 +16,7 @@ const getAllMedications = async () => {
 const addMedication = async (newMedication) => {
     try {
         const result = await client.query(
-            'INSERT INTO medications (name, dosage, frequency, start_date, end_date, user_id, notes) VALUES ($1, $2, $3, $4, $5, $6, $7);', newMedication
+            'INSERT INTO medications (user_id, fhir_medication_id, ) VALUES ($1, $2, $3, $4, $5, $6, $7);', newMedication
         );
         return result; // Return the created medication object
     } catch (error) {

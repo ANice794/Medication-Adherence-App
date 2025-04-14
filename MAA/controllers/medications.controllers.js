@@ -15,20 +15,22 @@ const addMedication = async (req, res) => {
         return res.status(400).json({ error: 'Request body is undefined' });
     }
 
+    let user_id = req.body.user_id;
+    let fhir_medication_id = req.body.fhir_medication_id;
     let name = req.body.name;
     let dosage = req.body.dosage;
+    let route = req.body.route;
     let frequency = req.body.frequency;
     let start_date = req.body.start_date;
     let end_date = req.body.end_date;
-    let user_id = req.body.patient_id;
-    let notes = req.body.notes;
+    let source = req.body.source;
 
     // Validate input data
-    if (!name || !dosage || !frequency || !start_date || !end_date || !user_id) {
+    if (!name || !dosage || !frequency || !start_date || !end_date || !user_id || !fhir_medication_id || !route || !source) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    let newMedication = [name, dosage, frequency, start_date, end_date, user_id, notes];
+    let newMedication = [user_id, fhir_medication_id, name, dosage, route, frequency, start_date, end_date, source];
 
     try {
         const addedMedication = await model.addMedication(newMedication);

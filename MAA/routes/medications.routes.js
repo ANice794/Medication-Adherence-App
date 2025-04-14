@@ -9,8 +9,8 @@ router.get("/:medicationId", controller.getOneMedication);
 router.put("/:medicationId", controller.updateMedication);
 router.delete("/:medicationId", controller.deleteMedication);
 router.get("/patients/:patientId", controller.getAllMedicationsForOnePatient);
-router.get("/patients/:patientId/:medicationId", controller.getOneMedicationForOnePatient);
-router.put("/patients/:patientId/:medicationId", controller.updateMedicationForOnePatient);
-router.delete("/patients/:patientId/:medicationId", controller.deleteMedicationForOnePatient);
+router.get("/:medicationId/patients/:patientId", controller.getOneMedicationForOnePatient);
+router.put("/:medicationId/patients/:patientId", controller.updateMedicationForOnePatient);
+router.delete("/:medicationId/patients/:patientId", controller.deleteMedicationForOnePatient);
 
 module.exports = router;

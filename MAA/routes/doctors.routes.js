@@ -9,7 +9,7 @@ router.get("/:doctorId/patients", controller.getAllPatientsForOneDoctor);
 router.get("/:doctorId", controller.getOneDoctor);
 router.put("/:doctorId", controller.updateDoctor);
 router.delete("/:doctorId", controller.deleteDoctor);
-router.get("/patients/:doctorId", controller.howManyPatientsPerDoctor);
+router.get("/:doctorId/patients/count", controller.howManyPatientsPerDoctor);
 
 
 module.exports = router;

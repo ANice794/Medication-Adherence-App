@@ -5,8 +5,8 @@ const router = express.Router();
 
 router.post("/doctor/:doctorId/patient/:patientId", controller.createNewChat);
 router.get("/:userId", controller.getAllChats);
-router.get("/messages/:chatId", controller.getAllMessages);
-router.post("/messages/:chatId", controller.createNewMessage);
+router.get("/:chatId/messages", controller.getAllMessages);
+router.post("/:chatId/messages", controller.createNewMessage);
 router.delete("/messages/:messageId", controller.deleteMessage);
 router.put("/messages/delete/:messageId", controller.softDeleteMessage);
 router.put("/messages/edit/:messageId", controller.editMessage);
