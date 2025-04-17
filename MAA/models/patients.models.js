@@ -7,9 +7,10 @@ const newPatient = async (newPatient) => {
     newPatient[6] = 'patient'; // Set the role to 'patient'
     try {
         const result = await client.query(
-            'INSERT INTO users (first_name, last_name, email, password, profile_picture, dob, roles) VALUES ($1, $2, $3, $4, $5, $6, $7);', newPatient
+            'INSERT INTO users (first_name, last_name, email, password, profile_picture, dob, roles) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;', newPatient
         );
-        return result; // Return the created patient object
+        //patientId = result.rows[0].id; // Get the ID of the newly created patient
+        return result.rows; // Return the created patient object
     } catch (error) {
         console.error('Error creating patient:', error);
         throw error; // Rethrow the error to be handled in the controller
@@ -60,7 +61,7 @@ const deletePatient = async (patientId) => {
 
 const getAllChats = async (patientId) => {
     try {
-        const result = await client.query('SELECT * FROM chat WHERE patient_id = $1', [patientId]);
+        const result = await client.query('SELECT * FROM chats WHERE patient = $1;', [patientId]);
         return result.rows;
     } catch (error) {
         console.error('Error fetching chats for patient:', error);
@@ -70,7 +71,7 @@ const getAllChats = async (patientId) => {
 
 const getAllMessages = async (patientId) => {
     try {
-        const result = await client.query('SELECT * FROM messages WHERE patient_id = $1', [patientId]);
+        const result = await client.query('SELECT * FROM messages WHERE sender_id = $1 OR receiver_id = $1;', [patientId]);
         return result.rows;
     } catch (error) {
         console.error('Error fetching messages for patient:', error);
@@ -80,7 +81,7 @@ const getAllMessages = async (patientId) => {
 
 const getAllMessagesForOneChat = async (patientId, chatId) => {
     try {
-        const result = await client.query('SELECT * FROM messages WHERE patient_id = $1 AND chat_id = $2', [patientId, chatId]);
+        const result = await client.query('SELECT * FROM messages WHERE (sender_id = $1 OR receiver_id = $1) AND chat_id = $2', [patientId, chatId]);
         return result.rows;
     } catch (error) {
         console.error('Error fetching messages for one chat:', error);
@@ -90,7 +91,7 @@ const getAllMessagesForOneChat = async (patientId, chatId) => {
 
 const createNewChat = async (doctorId, patientId) => {
     try {
-        const result = await client.query('INSERT INTO chat (doctor_id, patient_id) VALUES ($1, $2) RETURNING *;', [doctorId, patientId]);
+        const result = await client.query('INSERT INTO chats (doctor, patient) VALUES ($1, $2) RETURNING *;', [doctorId, patientId]);
         return result.rows; // Return the created chat object
     } catch (error) {
         console.error('Error creating new chat:', error);
@@ -100,7 +101,7 @@ const createNewChat = async (doctorId, patientId) => {
 
 const getAllDoctorsForOnePatient = async (patientId) => {
     try {
-        const result = await client.query('SELECT * FROM doctor WHERE patient_id = $1', [patientId]);
+        const result = await client.query('SELECT * FROM patient_and_doctor WHERE patient_id = $1', [patientId]);
         return result.rows; // Return the doctors for the patient
     } catch (error) {
         console.error('Error fetching doctors for patient:', error);
@@ -158,6 +159,26 @@ const removePointsFromPatient = async (patientId, points) => {
     }
 };
 
+const addPointTrackerToPatient = async (patientId) => {
+    try {
+        const result = await client.query('INSERT INTO points (user_id, current_points, overall_points, last_updated) VALUES ($1, $2, $2, $3) RETURNING *;', [patientId, 0, "NOW()"]);
+        return result.rows; // Return the added points tracker object
+    } catch (error) {
+        console.error('Error adding points tracker to patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const pointTrackerExists = async (patientId) => {
+    try {
+        const result = await client.query('SELECT * FROM points WHERE user_id = $1;', [patientId]);
+        return result.rows.length > 0; // Return true if the points tracker exists, false otherwise 
+    } catch (error) {
+        console.error('Error checking if points tracker exists:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
 const addPointsToPatient = async (patientId, points) => {
     try {
         const result = await client.query('UPDATE points SET current_points = current_points + $1, overall_points = overall_points + $2, last_updated = $3 WHERE user_id = $4 RETURNING *;', [points, points, "NOW()", patientId]);
@@ -181,10 +202,192 @@ const getAllPointsForPatient = async (patientId) => {
 const getCurrentPointsForPatient = async (patientId) => {
     try {
         const result = await client.query('SELECT current_points FROM points WHERE user_id = $1;', [patientId]);
-        return result.rows[0]; // Return the current points for the patient
+        return result.rows; // Return the current points for the patient
     } catch (error) {
         console.error('Error fetching current points for patient:', error);
         throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const addReminderToPatient = async (newReminder) => {
+    try {
+        const result = await client.query(
+            'INSERT INTO reminders (user_id, medication_name, dosage, schedule_time, frequency, start_date, end_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;', newReminder
+        );
+        return result.rows[0]; // Return the added reminder object
+    } catch (error) {
+        console.error('Error adding reminder to patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getAllRemindersForOnePatient = async (patientId) => {
+    try {
+        const result = await client.query('SELECT * FROM reminders WHERE user_id = $1;', [patientId]);
+        return result.rows; // Return the reminders for the patient
+    } catch (error) {
+        console.error('Error fetching reminders for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const updateReminderForOnePatient = async (patientId, reminderId, updatedData) => {
+    try {
+        const query = 'UPDATE reminders SET medication_name = $1, dosage = $2, schedule_time = $3, frequency = $4, start_date = $5, end_date = $6 WHERE user_id = $7 AND id = $8 RETURNING *;';
+        const values = [updatedData.medication_name, updatedData.dosage, updatedData.schedule_time, updatedData.frequency, updatedData.start_date, updatedData.end_date, patientId, reminderId];
+        const result = await client.query(query, values);
+        return result.rows[0]; // Return the updated reminder object
+    } catch (error) {
+        console.error('Error updating reminder for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const deleteReminderForOnePatient = async (patientId, reminderId) => {
+    try {
+        const result = await client.query('DELETE FROM reminders WHERE user_id = $1 AND id = $2 RETURNING *;', [patientId, reminderId]);
+        return result.rows[0]; // Return the deleted reminder object
+    } catch (error) {
+        console.error('Error deleting reminder for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getOneReminderForOnePatient = async (patientId, reminderId) => {
+    try {
+        const result = await client.query('SELECT * FROM reminders WHERE user_id = $1 AND id = $2;', [patientId, reminderId]);
+        return result.rows[0]; // Return the reminder object
+    } catch (error) {
+        console.error('Error fetching reminder for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getAdherenceForOnePatient = async (patientId) => {
+    try {
+        const result = await client.query('SELECT * FROM adherence WHERE user_id = $1;', [patientId]);
+        return result.rows[0]; // Return the adherence object
+    } catch (error) {
+        console.error('Error fetching adherence for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const addAdherenceForOnePatient = async (adherence) => {
+    try {
+        const result = await client.query(
+            'INSERT INTO adherence (user_id, reminder_id, schedule_for,points_awarded) VALUES ($1, $2, $3, $4) RETURNING *;', adherence
+        );
+        return result.rows[0]; // Return the added adherence object
+    } catch (error) {
+        console.error('Error adding adherence for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const updateAdherenceForOnePatient = async (patientId, adherenceId, updatedData) => {
+    try {
+        const query = 'UPDATE adherence SET medication_name = $1, dosage = $2, schedule_time = $3, frequency = $4, start_date = $5, end_date = $6 WHERE user_id = $7 AND id = $8 RETURNING *;';
+        const values = [updatedData.medication_name, updatedData.dosage, updatedData.schedule_time, updatedData.frequency, updatedData.start_date, updatedData.end_date, patientId, adherenceId];
+        const result = await client.query(query, values);
+        return result.rows; // Return the updated adherence object
+    } catch (error) {
+        console.error('Error updating adherence for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const deleteAdherenceForOnePatient = async (patientId, adherenceId) => {
+    try {
+        const result = await client.query('DELETE FROM adherence WHERE user_id = $1 AND id = $2 RETURNING *;', [patientId, adherenceId]);
+        return result.rows; // Return the deleted adherence object
+    } catch (error) {
+        console.error('Error deleting adherence for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getOneAdherenceForOnePatient = async (patientId, adherenceId) => {
+    try {
+        const result = await client.query('SELECT * FROM adherence WHERE user_id = $1 AND id = $2;', [patientId, adherenceId]);
+        return result.rows; // Return the adherence object
+    } catch (error) {
+        console.error('Error fetching adherence for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getAdherenceForOneReminderForOnePatient = async (patientId, reminderId) => {
+    try {
+        const result = await client.query('SELECT * FROM adherence WHERE user_id = $1 AND reminder_id = $2;', [patientId, reminderId]);
+        return result.rows; // Return the adherence object
+    } catch (error) {
+        console.error('Error fetching adherence for reminder for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const addHealthDataForOnePatient = async (healthData) => {
+    try {
+        const result = await client.query(
+            'INSERT INTO health_data (user_id, data_type, value, unit, recorded_at) VALUES ($1, $2, $3, $4, $5) RETURNING *;', healthData
+        );
+        return result.rows; // Return the added health data object
+    } catch (error) {
+        console.error('Error adding health data for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getAllHealthDataForOnePatient = async (patientId) => {
+    try {
+        const result = await client.query('SELECT * FROM health_data WHERE user_id = $1;', [patientId]);
+        return result.rows; // Return the health data for the patient
+    } catch (error) {
+        console.error('Error fetching health data for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getOneHealthDataForOnePatient = async (patientId, healthId) => {
+    try {
+        const result = await client.query('SELECT * FROM health_data WHERE user_id = $1 AND id = $2;', [patientId, healthId]);
+        return result.rows; // Return the health data object
+    } catch (error) {
+        console.error('Error fetching health data for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const updateHealthDataForOnePatient = async (patientId, healthId, updatedData) => {
+    try {
+        const query = 'UPDATE health_data SET data_type = $1, value = $2, unit = $3, recorded_at = $4 WHERE user_id = $5 AND id = $6 RETURNING *;';
+        const values = [updatedData.data_type, updatedData.value, updatedData.unit, "NOW()", patientId, healthId];
+        const result = await client.query(query, values);
+        return result.rows; // Return the updated health data object
+    } catch (error) {
+        console.error('Error updating health data for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const deleteHealthDataForOnePatient = async (patientId, healthId) => {
+    try {
+        const result = await client.query('DELETE FROM health_data WHERE user_id = $1 AND id = $2 RETURNING *;', [patientId, healthId]);
+        return result.rows; // Return the deleted health data object
+    } catch (error) {
+        console.error('Error deleting health data for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+const getLastHealthDataForOnePatient = async (patientId) => {
+    try {
+        const result = await client.query('SELECT * FROM health_data WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 1;', [patientId]);
+        return result.rows;
+    } catch (error) {
+        console.error('Error fetching last health data for patient:', error);
+        throw error;
     }
 };
 
@@ -205,6 +408,25 @@ module.exports = {
     getReward,
     removePointsFromPatient,
     addPointsToPatient,
+    addPointTrackerToPatient,
+    pointTrackerExists,
     getAllPointsForPatient,
     getCurrentPointsForPatient,
+    addReminderToPatient,
+    getAllRemindersForOnePatient,
+    updateReminderForOnePatient,
+    deleteReminderForOnePatient,
+    getOneReminderForOnePatient,
+    getAdherenceForOnePatient,
+    addAdherenceForOnePatient,
+    updateAdherenceForOnePatient,
+    deleteAdherenceForOnePatient,
+    getOneAdherenceForOnePatient,
+    getAdherenceForOneReminderForOnePatient,
+    addHealthDataForOnePatient,
+    getAllHealthDataForOnePatient,
+    getOneHealthDataForOnePatient,
+    updateHealthDataForOnePatient,
+    deleteHealthDataForOnePatient,
+    getLastHealthDataForOnePatient,
 };

@@ -16,21 +16,21 @@ const addMedication = async (req, res) => {
     }
 
     let user_id = req.body.user_id;
-    let fhir_medication_id = req.body.fhir_medication_id;
+    let fhir_medication_id = req.body.fhir_medication_id || null;
     let name = req.body.name;
     let dosage = req.body.dosage;
     let route = req.body.route;
     let frequency = req.body.frequency;
     let start_date = req.body.start_date;
-    let end_date = req.body.end_date;
+    let end_date = req.body.end_date || null;
     let source = req.body.source;
 
     // Validate input data
-    if (!name || !dosage || !frequency || !start_date || !end_date || !user_id || !fhir_medication_id || !route || !source) {
+    if (!name || !dosage || !frequency || !start_date || !user_id || !route || !source) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    let newMedication = [user_id, fhir_medication_id, name, dosage, route, frequency, start_date, end_date, source];
+    let newMedication = [user_id, fhir_medication_id, name, dosage, route, frequency, start_date, end_date, source, "NOW()"];
 
     try {
         const addedMedication = await model.addMedication(newMedication);

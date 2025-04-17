@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const createNewChat = async (doctorId, patientId) => {
     try {
         const result = await client.query(
-            'INSERT INTO chats (doctor_id, patient_id) VALUES ($1, $2) RETURNING *;', [doctorId, patientId]
+            'INSERT INTO chats (doctor, patient) VALUES ($1, $2) RETURNING *;', [doctorId, patientId]
         );
         return result.rows[0]; // Return the created chat object
     } catch (error) {
@@ -17,7 +17,7 @@ const createNewChat = async (doctorId, patientId) => {
 
 const getAllChats = async (userId) => {
     try {
-        const result = await client.query('SELECT * FROM chats WHERE doctor_id = $1 OR patient_id = $1;', [userId]);
+        const result = await client.query('SELECT * FROM chats WHERE doctor = $1 OR patient = $1;', [userId]);
         return result.rows; // Return the chats for the user
     } catch (error) {
         console.error('Error fetching chats:', error);
@@ -38,7 +38,7 @@ const getAllMessages = async (chatId) => {
 const createNewMessage = async (message) => {
     try {
         const result = await client.query(
-            'INSERT INTO messages (chat_id, sender_id, receiver_id, content, is_read, status, parent_message_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;', message
+            'INSERT INTO messages (chat_id, sender_id, receiver_id, content, parent_message_id) VALUES ($1, $2, $3, $4, $5) RETURNING *;', message
         );
         return result.rows[0]; // Return the created message object
     } catch (error) {
@@ -79,7 +79,7 @@ const editMessage = async (messageId, content) => {
 
 const markAsRead = async (messageId) => {
     try {
-        const result = await client.query('UPDATE messages SET is_read = TRUE WHERE id = $1 RETURNING *;', [messageId]);
+        const result = await client.query('UPDATE messages SET is_read = TRUE, status = \'read\' WHERE id = $1 RETURNING *;', [messageId]);
         return result.rows[0]; // Return the updated message object
     } catch (error) {
         console.error('Error marking message as read:', error);

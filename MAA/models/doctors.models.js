@@ -7,9 +7,9 @@ const createDoctor = async (newDoctor) => {
     newDoctor[6] = 'doctor'; // Set the role to 'doctor'
     try {
         const result = await client.query(
-            'INSERT INTO users (first_name, last_name, email, password, profile_picture, dob, roles) VALUES ($1, $2, $3, $4, $5, $6, $7);', newDoctor
+            'INSERT INTO users (first_name, last_name, email, password, profile_picture, dob, roles) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;', newDoctor
         );
-        return result; // Return the created doctor object
+        return result.rows; // Return the created doctor object
     } catch (error) {
         console.error('Error creating doctor:', error);
         throw error; // Rethrow the error to be handled in the controller

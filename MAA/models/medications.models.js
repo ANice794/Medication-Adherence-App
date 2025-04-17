@@ -16,9 +16,9 @@ const getAllMedications = async () => {
 const addMedication = async (newMedication) => {
     try {
         const result = await client.query(
-            'INSERT INTO medications (user_id, fhir_medication_id, ) VALUES ($1, $2, $3, $4, $5, $6, $7);', newMedication
+            'INSERT INTO medications (user_id, fhir_medication_id, name, dosage, route, frequency, start_date, end_date, source, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;', newMedication
         );
-        return result; // Return the created medication object
+        return result.rows; // Return the created medication object
     } catch (error) {
         console.error('Error adding medication:', error);
         throw error; // Rethrow the error to be handled in the controller
@@ -69,8 +69,8 @@ const getAllMedicationsForOnePatient = async (patientId) => {
 
 const updateMedicationForOnePatient = async (patientId, medicationId, updatedData) => {
     try {
-        const query = 'UPDATE medications SET name = $1, dosage = $2, frequency = $3, start_date = $4, end_date = $5, notes = $6 WHERE id = $7 AND user_id = $8 RETURNING *;';
-        const values = [updatedData.name, updatedData.dosage, updatedData.frequency, updatedData.start_date, updatedData.end_date, updatedData.user_id, updatedData.notes, medicationId, patientId];
+        const query = 'UPDATE medications SET fhir_medication_id = $1, name = $2, dosage = $3, frequency = $4, start_date = $5, end_date = $6, source = $7 WHERE id = $8 AND user_id = $9 RETURNING *;';
+        const values = [updatedData.fhir_medication_id, updatedData.name, updatedData.dosage, updatedData.frequency, updatedData.start_date, updatedData.end_date, updatedData.source, medicationId, patientId];
         const result = await client.query(query, values);
         return result.rows; // Return the updated medication object
     } catch (error) {
@@ -89,6 +89,8 @@ const deleteMedicationForOnePatient = async (patientId, medicationId) => {
     }
 };
 
+
+
 module.exports = {
     getAllMedications,
     addMedication,
@@ -97,5 +99,6 @@ module.exports = {
     deleteMedication,
     getAllMedicationsForOnePatient,
     updateMedicationForOnePatient,
-    deleteMedicationForOnePatient
+    deleteMedicationForOnePatient,
+
 };

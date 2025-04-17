@@ -57,18 +57,16 @@ const createNewMessage = async (req, res) => {
     const sender_id = req.body.sender_id;
     const receiver_id = req.body.receiver_id;
     const content = req.body.content;
-    const is_read = req.body.is_read;
-    const status = req.body.status;
-    const parent_message_id = req.body.parent_message_id;
+    const parent_message_id = req.body.parent_message_id || null;
     
 
     // Validate input data
-    if (!chatId || !sender_id || !receiver_id || !content || !is_read || !status) {
+    if (!chatId || !sender_id || !receiver_id || !content ) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
     try {
-        const message = [chatId, sender_id, receiver_id, content, is_read, status, parent_message_id];
+        const message = [chatId, sender_id, receiver_id, content, parent_message_id];
         const newMessage = await model.createNewMessage(message);
         res.status(201).json(newMessage);
     } catch (error) {

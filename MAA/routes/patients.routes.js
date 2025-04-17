@@ -24,7 +24,8 @@ router.get("/:patientId/rewards", controller.getAllRewardsForOnePatient);
 //POINTS ROUTES
 router.get("/:patientId/points/current", controller.getCurrentPointsForPatient);
 router.get("/:patientId/points/all", controller.getAllPointsForPatient);
-router.post("/:patientId/points", controller.addPointsToPatient);
+router.put("/:patientId/points", controller.addPointsToPatient);
+router.post("/:patientId/points", controller.addPointTrackerToPatient);
 
 //REMINDERS ROUTES
 router.post("/:patientId/reminders", controller.addReminder);
@@ -40,6 +41,15 @@ router.put("/:patientId/adherence/:adherenceId", controller.updateAdherenceForOn
 router.delete("/:patientId/adherence/:adherenceId", controller.deleteAdherenceForOnePatient);
 router.get("/:patientId/adherence/:adherenceId", controller.getOneAdherenceForOnePatient);
 router.get("/:patientId/adherence/reminders/:reminderId", controller.getAdherenceForOneReminderForOnePatient);
+
+
+//HEALTH ROUTES
+router.post("/:patientId/health", controller.addHealthDataForOnePatient);
+router.get("/:patientId/health", controller.getAllHealthDataForOnePatient);
+router.get("/:patientId/health/:healthId", controller.getOneHealthDataForOnePatient);
+router.put("/:patientId/health/:healthId", controller.updateHealthDataForOnePatient);
+router.delete("/:patientId/health/:healthId", controller.deleteHealthDataForOnePatient);
+router.get("/:patientId/last/health/", controller.getLastHealthDataForOnePatient);
 
 
 module.exports = router;

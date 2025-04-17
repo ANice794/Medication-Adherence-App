@@ -9,24 +9,27 @@ const addPatient = async (req, res, next) => {
     let last_name = req.body.last_name;
     let email = req.body.email;
     let password = req.body.password;
-    let profile_picture = req.body.profile_picture || null; // Default to null if not provided
+    let profile_picture = req.body.profile_picture || null;
+    let role = 'patient';
     let dob = req.body.dob;
 
-    // Validate input data
-    if (!first_name || !last_name || !email || !password || !dob) {
+    if (!first_name || !last_name || !email || !password || !dob || !role) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
-    let newPatient = [first_name, last_name, email, password, profile_picture, dob];
-    try {
 
-        let theNewPatient = await model.createPatient(newPatient);
-        await model.addPointsToPatient([theNewPatient.id]);
+    let newPatient = [first_name, last_name, email, password, profile_picture, dob, role];
+
+    try {
+        let theNewPatient = await model.newPatient(newPatient);
+
         res.json(theNewPatient);
     } catch (error) {
-        console.error('Error adding doctor:', error);
+        console.error('Error adding patient:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+
 
 const getPatients = async (req, res) => {
     try {
@@ -238,6 +241,11 @@ const getCurrentPointsForPatient = async (req, res) => {
     }
 
     try {
+        const trackerExist = await model.pointTrackerExists(patientId);
+        if (!trackerExist) {
+            await model.addPointTrackerToPatient(patientId);
+            //res.json({ message: 'No points available for this patient' });
+        }
         const points = await model.getCurrentPointsForPatient(patientId);
         res.json(points);
     } catch (error) {
@@ -254,6 +262,11 @@ const getAllPointsForPatient = async (req, res) => {
     }
 
     try {
+        const trackerExist = await model.pointTrackerExists(patientId);
+        if (!trackerExist) {
+            await model.addPointTrackerToPatient(patientId);
+            //res.json({ message: 'No points available for this patient' });
+        }
         const points = await model.getAllPointsForPatient(patientId);
         res.json(points);
     } catch (error) {
@@ -271,10 +284,26 @@ const addPointsToPatient = async (req, res) => {
     }
 
     try {
+        const trackerExist = await model.pointTrackerExists(patientId);
+        if (!trackerExist) {
+            await model.addPointTrackerToPatient(patientId);
+            //res.json({ message: 'No points available for this patient' });
+        } 
         const updatedPatient = await model.addPointsToPatient(patientId, points);
         res.json(updatedPatient);
     } catch (error) {
         console.error('Error adding points to patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const addPointTrackerToPatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    try {
+        const pointTracker = await model.addPointTrackerToPatient(patientId);
+        res.json(pointTracker);
+    } catch (error) {
+        console.error('Error adding point tracker to patient:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -391,15 +420,15 @@ const addAdherenceForOnePatient = async (req, res) => {
     let user_id = req.params.patientId;
     let reminder_id = req.params.reminderId;
     let schedule_for = req.body.schedule_for;
-    let points_rewarded = req.body.points_rewarded;
+    let points_awarded = req.body.points_awarded;
     try {
 
-        if (!user_id || !reminder_id || !schedule_for || !points_rewarded) {
+        if (!user_id || !reminder_id || !schedule_for || !points_awarded) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
-
-        const updatedAdherence = await model.addAdherenceForOnePatient(patientId, medicationId, adherence);
-        res.json(updatedAdherence);
+        let adherence = [user_id, reminder_id, schedule_for, points_awarded];
+        const newAdherence = await model.addAdherenceForOnePatient(adherence);
+        res.json(newAdherence);
     } catch (error) {
         console.error('Error adding adherence for patient:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -474,6 +503,114 @@ const getAdherenceForOneReminderForOnePatient = async (req, res) => {
     }
 };
 
+const addHealthDataForOnePatient = async (req, res) => {
+    let user_id = req.params.patientId;
+    let data_type = req.body.data_type;
+    let value = req.body.value;
+    let unit = req.body.unit;
+
+    if (!user_id || !data_type || !value || !unit) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+    let healthData = [user_id, data_type, value, unit, "NOW()"];
+
+    try {
+        const newHealthData = await model.addHealthDataForOnePatient(healthData);
+        res.json(newHealthData);
+    } catch (error) {
+        console.error('Error adding health data for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getAllHealthDataForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const healthData = await model.getAllHealthDataForOnePatient(patientId);
+        res.json(healthData);
+    } catch (error) {
+        console.error('Error fetching health data for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getOneHealthDataForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let healthId = req.params.healthId;
+
+    if (!patientId || !healthId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const healthData = await model.getOneHealthDataForOnePatient(patientId, healthId);
+        res.json(healthData);
+    } catch (error) {
+        console.error('Error fetching health data for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const updateHealthDataForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let healthId = req.params.healthId;
+    let updatedData = req.body;
+
+    if (!patientId || !healthId || !updatedData) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const updatedHealthData = await model.updateHealthDataForOnePatient(patientId, healthId, updatedData);
+        res.json(updatedHealthData);
+    } catch (error) {
+        console.error('Error updating health data for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const deleteHealthDataForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let healthId = req.params.healthId;
+
+    if (!patientId || !healthId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const deletedHealthData = await model.deleteHealthDataForOnePatient(patientId, healthId);
+        res.json(deletedHealthData);
+    } catch (error) {
+        console.error('Error deleting health data for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+const getLastHealthDataForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!Number.isInteger(Number(patientId))) {
+        return res.status(400).json({ error: 'Invalid patient ID' });
+    }
+
+    try {
+        const healthData = await model.getLastHealthDataForOnePatient(patientId);
+        res.json(healthData);
+    } catch (error) {
+        console.error('Error fetching last health data for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     addPatient,
     getPatients,
@@ -491,6 +628,7 @@ module.exports = {
     getCurrentPointsForPatient,
     getAllPointsForPatient,
     addPointsToPatient,
+    addPointTrackerToPatient,
     addReminder,
     getAllRemindersForOnePatient,
     updateReminderForOnePatient,
@@ -502,4 +640,10 @@ module.exports = {
     deleteAdherenceForOnePatient,
     getOneAdherenceForOnePatient,
     getAdherenceForOneReminderForOnePatient,
+    addHealthDataForOnePatient,
+    getAllHealthDataForOnePatient,
+    getOneHealthDataForOnePatient,
+    updateHealthDataForOnePatient,
+    deleteHealthDataForOnePatient,
+    getLastHealthDataForOnePatient,
 };
