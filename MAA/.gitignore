@@ -4,10 +4,10 @@
 node_modules/
 
 # Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+frontend/expo-env.d.ts
 
 # Native
 *.orig.*
@@ -35,4 +35,4 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-app-example
+frontend/app-example
