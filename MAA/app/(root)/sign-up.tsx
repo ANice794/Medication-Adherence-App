@@ -4,6 +4,7 @@ import { Link, Redirect, useRouter } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { useUser } from '../../context/UserContext';
 
 // Get API URL from environment variables
 const API_URL = 'http://localhost:3000';
@@ -17,11 +18,12 @@ interface User {
     dob: string;
     role: string;
     profilePicture: string;
+    first_name?: string;
+    last_name?: string;
+    roles?: string;
 }
 
 const SignUp = () => {
-
-
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
@@ -29,8 +31,8 @@ const SignUp = () => {
     const [dob, setDob] = useState('');
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [user, setUser] = useState<User | null>(null);
-
     const router = useRouter();
+    const { setUser: setContextUser } = useUser();
 
     async function handleSubmit(event: { preventDefault: () => void; }) {
         event.preventDefault();
@@ -45,16 +47,74 @@ const SignUp = () => {
             });
             const array = response.data;
             console.log('Registration successful:', array);
+            console.log('Response data type:', typeof array);
+            console.log('Response data keys:', Object.keys(array[0]));
+            
+            const userData = array[0] as any;
+            const firstNameValue = userData.firstName || userData.first_name;
+            const lastNameValue = userData.lastName || userData.last_name;
+            const roleValue = userData.role || userData.roles || 'patient';
+            
+            console.log('firstName value:', firstNameValue);
+            console.log('lastName value:', lastNameValue);
+            console.log('Full userData object:', JSON.stringify(userData, null, 2));
+            
             Alert.alert('Success', 'Registration successful!');
+            
+            // Store user details in AsyncStorage
+            console.log('Storing user data in AsyncStorage...');
             await AsyncStorage.setItem('isLoggedIn', 'true');
-            await AsyncStorage.setItem('email', array[0].email);
-            await AsyncStorage.setItem('password', array[0].password);
-            await AsyncStorage.setItem('firstName', array[0].firstName);
-            await AsyncStorage.setItem('lastName', array[0].lastName);
-            await AsyncStorage.setItem('dob', array[0].id.toString());
-            await AsyncStorage.setItem('id', array[0].id.toString());
-            await AsyncStorage.setItem('role', array[0].role);
-            await AsyncStorage.setItem('profilePicture', array[0].profilePicture); // Placeholder URL
+            await AsyncStorage.setItem('email', userData.email);
+            await AsyncStorage.setItem('password', userData.password);
+            await AsyncStorage.setItem('firstName', firstNameValue);
+            await AsyncStorage.setItem('lastName', lastNameValue);
+            await AsyncStorage.setItem('dob', userData.dob);
+            await AsyncStorage.setItem('id', userData.id.toString());
+            await AsyncStorage.setItem('role', roleValue);
+            await AsyncStorage.setItem('profilePicture', userData.profilePicture || '');
+
+            // Update the UserContext
+            setContextUser({
+                id: userData.id,
+                email: userData.email,
+                password: userData.password,
+                firstName: firstNameValue,
+                lastName: lastNameValue,
+                dob: userData.dob,
+                role: roleValue,
+                profilePicture: userData.profilePicture || '',
+                isLoggedIn: true,
+                setId: () => {},
+                setEmail: () => {},
+                setPassword: () => {},
+                setFirstName: () => {},
+                setLastName: () => {},
+                setDob: () => {},
+                setRole: () => {},
+                setProfilePicture: () => {},
+                setIsLoggedIn: () => {},
+                setUser: () => {},
+            });
+            
+            // Verify data was stored correctly
+            console.log('Verifying stored data...');
+            const storedIsLoggedIn = await AsyncStorage.getItem('isLoggedIn');
+            const storedEmail = await AsyncStorage.getItem('email');
+            const storedFirstName = await AsyncStorage.getItem('firstName');
+            const storedLastName = await AsyncStorage.getItem('lastName');
+            const storedDob = await AsyncStorage.getItem('dob');
+            const storedId = await AsyncStorage.getItem('id');
+            const storedRole = await AsyncStorage.getItem('role');
+            
+            console.log('Stored data verification:');
+            console.log('isLoggedIn:', storedIsLoggedIn);
+            console.log('email:', storedEmail);
+            console.log('firstName:', storedFirstName);
+            console.log('lastName:', storedLastName);
+            console.log('dob:', storedDob);
+            console.log('id:', storedId);
+            console.log('role:', storedRole);
+            
             setIsLoggedIn(true);
             router.replace('/(root)/(tabs)');
         } catch (error) {

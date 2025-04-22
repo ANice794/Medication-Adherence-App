@@ -15,7 +15,8 @@
     "preset": "jest-expo"
   },
   "dependencies": {
-    "@expo/vector-icons": "^14.0.2",
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/drawer": "^7.1.1",
     "@react-navigation/material-top-tabs": "^7.1.0",
@@ -53,8 +54,7 @@
     "react-native-webview": "13.12.5",
     "react-router-dom": "^7.5.0",
     "sequelize": "^6.37.7",
-    "ts-node": "^10.9.2",
-    "@react-native-async-storage/async-storage": "1.23.1"
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Home() {
     const router = useRouter();
-    /*const { firstName, setUser } = useUser();
+    const { firstName, setUser } = useUser();
 
     const handleLogout = async () => {
         // Clear AsyncStorage
@@ -46,12 +46,12 @@ export default function Home() {
 
         // Navigate to login
         router.replace('/login');
-    };*/
+    };
 
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.welcomeText}>Welcome back!</Text>
+                <Text style={styles.welcomeText}>Welcome back! {firstName}!</Text>
             </View>
 
             <View style={styles.section}>
@@ -86,6 +86,7 @@ export default function Home() {
 
             <TouchableOpacity 
                 style={styles.logoutButton}
+                onPress={handleLogout}
             >
                 <Text style={styles.logoutText}>Sign Out</Text>
             </TouchableOpacity>

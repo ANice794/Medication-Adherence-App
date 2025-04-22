@@ -7,12 +7,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
     const router = useRouter();
-    const { isLoggedIn } = useUser();
+    const { isLoggedIn, firstName, lastName, email } = useUser();
 
     useEffect(() => {
+        console.log("TabsLayout - User data:");
+        console.log("isLoggedIn:", isLoggedIn);
+        console.log("firstName:", firstName);
+        console.log("lastName:", lastName);
+        console.log("email:", email);
+        
         const checkAuth = async () => {
             const storedIsLoggedIn = await AsyncStorage.getItem("isLoggedIn");
+            console.log("TabsLayout - Stored isLoggedIn:", storedIsLoggedIn);
+            
             if (storedIsLoggedIn !== "true") {
+                console.log("TabsLayout - User not logged in, redirecting to login");
                 router.replace("/login");
             }
         };

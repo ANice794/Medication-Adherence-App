@@ -26,7 +26,9 @@ const Login = () => {
                 email,
                 password,
             });
-            console.log(response.data);
+            console.log("RESPONSE", response.data);
+            console.log("RESPONSE TYPE:", typeof response.data);
+            console.log("RESPONSE LENGTH:", (response.data as any[]).length);
             const currentUser = (response.data as Array<{
                 id: number;
                 email: string;
@@ -37,6 +39,24 @@ const Login = () => {
                 role: string;
                 profilePicture?: string;
             }>)[0];
+
+            console.log("currentUser", currentUser);
+            console.log("firstName:", currentUser.firstName);
+            console.log("lastName:", currentUser.lastName);
+            
+            // Check if firstName and lastName are undefined
+            if (currentUser.firstName === undefined || currentUser.lastName === undefined) {
+                console.error("firstName or lastName is undefined!");
+                console.log("currentUser keys:", Object.keys(currentUser));
+                console.log("currentUser values:", Object.values(currentUser));
+                
+                // Check if the server is using first_name and last_name instead
+                if ('first_name' in currentUser && 'last_name' in currentUser) {
+                    console.log("Using first_name and last_name from server");
+                    currentUser.firstName = currentUser.first_name as string;
+                    currentUser.lastName = currentUser.last_name as string;
+                }
+            }
 
             // Store user details in AsyncStorage
             await AsyncStorage.setItem('isLoggedIn', 'true');
@@ -109,7 +129,7 @@ const Login = () => {
                 <Text style={styles.buttonText}>Login</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push('/register')}>
+            <TouchableOpacity onPress={() => router.push('/sign-up')}>
                 <Text style={styles.linkText}>Don't have an account? Register here</Text>
             </TouchableOpacity>
         </View>
