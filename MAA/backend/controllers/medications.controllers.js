@@ -111,6 +111,23 @@ const getAllMedicationsForOnePatient = async (req, res) => {
     }
 };
 
+const addMedicationForOnePatient = async (req, res) => {
+    let patientId = req.params.patientId;
+    let medicationId = req.body.medicationId;
+
+    if (!patientId || !medicationId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const addedMedication = await model.addMedicationForOnePatient(patientId, medicationId);
+        res.status(201).json(addedMedication);
+    } catch (error) {
+        console.error('Error adding medication for patient:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 const getOneMedicationForOnePatient = async (req, res) => {
     let patientId = req.params.patientId;
     let medicationId = req.params.medicationId;
@@ -172,6 +189,7 @@ module.exports = {
     getAllMedications,
     addMedication,
     getOneMedication,
+    addMedicationForOnePatient,
     updateMedication,
     deleteMedication,
     getAllMedicationsForOnePatient,

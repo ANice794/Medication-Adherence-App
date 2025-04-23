@@ -9,6 +9,7 @@ router.get("/:medicationId", controller.getOneMedication);
 router.put("/:medicationId", controller.updateMedication);
 router.delete("/:medicationId", controller.deleteMedication);
 router.get("/patients/:patientId", controller.getAllMedicationsForOnePatient);
+router.post("/patients/:patientId", controller.addMedicationForOnePatient);
 router.get("/:medicationId/patients/:patientId", controller.getOneMedicationForOnePatient);
 router.put("/:medicationId/patients/:patientId", controller.updateMedicationForOnePatient);
 router.delete("/:medicationId/patients/:patientId", controller.deleteMedicationForOnePatient);

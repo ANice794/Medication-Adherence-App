@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "web": {
+      "config": {
+        "googleFit": {
+          "clientId": "165063434271-t863cqbhj01k2b7eaf7879buanus2qmn.apps.googleusercontent.com",
+          "apiKey": "AIzaSyDu-EDXZw4a30QSbaLB7FaIyI0kj5Ek17"
+        }
+      },
+      "bundler": "metro"
+    }
+  }
+} 

@@ -82,7 +82,15 @@ const Profile = () => {
             <ProfileSection title="Personal Information">
                 <ProfileItem icon="person" label="Full Name" value={`${firstName} ${lastName}`} />
                 <ProfileItem icon="mail" label="Email" value={email} />
-                <ProfileItem icon="calendar" label="Date of Birth" value={dob} />
+                <ProfileItem 
+                    icon="calendar" 
+                    label="Date of Birth" 
+                    value={new Date(dob).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })} 
+                />
             </ProfileSection>
 
             <ProfileSection title="Settings">

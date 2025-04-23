@@ -67,6 +67,17 @@ const getAllMedicationsForOnePatient = async (patientId) => {
     }
 };
 
+const addMedicationForOnePatient = async (patientId, medicationId) => {
+    try {
+        const result = await client.query('INSERT INTO medications (user_id, fhir_medication_id) VALUES ($1, $2);', [patientId, medicationId]);
+        return result.rows;
+    } catch (error) {
+        console.error('Error adding medication for patient:', error);
+        throw error; // Rethrow the error to be handled in the controller
+    }
+};
+
+
 const updateMedicationForOnePatient = async (patientId, medicationId, updatedData) => {
     try {
         const query = 'UPDATE medications SET fhir_medication_id = $1, name = $2, dosage = $3, frequency = $4, start_date = $5, end_date = $6, source = $7 WHERE id = $8 AND user_id = $9 RETURNING *;';

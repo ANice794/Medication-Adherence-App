@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,9 +7,13 @@ import {
     TouchableOpacity,
     Dimensions,
     Platform,
+    Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import HealthService from '../../../services/HealthService';
+import WebHealthService from '../../../services/WebHealthService';
+import { HealthData } from '../../../services/HealthService';
 
 interface HealthMetric {
     id: string;
@@ -23,69 +27,154 @@ interface HealthMetric {
 }
 
 const Health = () => {
-    // Sample data - replace with actual health data from Apple Health/Google Fit
-    const [healthMetrics] = useState<HealthMetric[]>([
+    const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([
         {
             id: '1',
             title: 'Steps',
-            value: '7,543',
+            value: '0',
             unit: 'steps',
             icon: 'footsteps',
             color: '#FF9500',
-            change: '+12%',
-            trend: 'up',
+            change: '--',
+            trend: 'stable',
         },
         {
             id: '2',
             title: 'Heart Rate',
-            value: '72',
+            value: '0',
             unit: 'bpm',
             icon: 'heart',
             color: '#FF2D55',
-            change: 'Normal',
+            change: '--',
             trend: 'stable',
         },
         {
             id: '3',
             title: 'Sleep',
-            value: '7.5',
-            unit: 'hours',
+            value: '0',
+            unit: 'hrs',
             icon: 'moon',
             color: '#5856D6',
-            change: '+30min',
-            trend: 'up',
+            change: '--',
+            trend: 'stable',
         },
         {
             id: '4',
-            title: 'Blood Pressure',
-            value: '120/80',
-            unit: 'mmHg',
+            title: 'Oxygen',
+            value: '0',
+            unit: '%',
             icon: 'fitness',
             color: '#FF3B30',
-            change: 'Normal',
+            change: '--',
             trend: 'stable',
         },
         {
             id: '5',
-            title: 'Weight',
-            value: '68',
-            unit: 'kg',
-            icon: 'body',
+            title: 'Meditation',
+            value: '0',
+            unit: 'min',
+            icon: 'leaf',
             color: '#4CD964',
-            change: '-0.5kg',
-            trend: 'down',
+            change: '--',
+            trend: 'stable',
         },
         {
             id: '6',
             title: 'Activity',
-            value: '32',
+            value: '0',
             unit: 'min',
             icon: 'walk',
             color: '#007AFF',
-            change: '+5min',
-            trend: 'up',
+            change: '--',
+            trend: 'stable',
         },
     ]);
+
+    const [isConnected, setIsConnected] = useState(false);
+
+    useEffect(() => {
+        if (isConnected) {
+            updateHealthData();
+            // Update health data every 5 minutes
+            const interval = setInterval(updateHealthData, 5 * 60 * 1000);
+            return () => clearInterval(interval);
+        }
+    }, [isConnected]);
+
+    const updateHealthData = async () => {
+        try {
+            const service = Platform.OS === 'web' ? WebHealthService : HealthService;
+            const data = await service.getHealthData();
+            
+            setHealthMetrics(prev => prev.map(metric => {
+                let value = '0';
+                let change = '--';
+                let trend: 'up' | 'down' | 'stable' = 'stable';
+
+                switch (metric.title.toLowerCase()) {
+                    case 'steps':
+                        const steps = data.steps ?? 0;
+                        value = steps.toLocaleString();
+                        change = steps > 7500 ? '+12%' : '-8%';
+                        trend = steps > 7500 ? 'up' : 'down';
+                        break;
+                    case 'heart rate':
+                        value = Math.round(data.heartRate ?? 0).toString();
+                        change = 'Normal';
+                        trend = 'stable';
+                        break;
+                    case 'sleep':
+                        const sleep = data.sleep ?? 0;
+                        value = sleep.toString();
+                        change = sleep > 7 ? '+30min' : '-30min';
+                        trend = sleep > 7 ? 'up' : 'down';
+                        break;
+                    case 'oxygen':
+                        value = (data.oxygenSaturation ?? 0).toString();
+                        change = 'Normal';
+                        trend = 'stable';
+                        break;
+                    case 'meditation':
+                        const meditation = data.meditation ?? 0;
+                        value = meditation.toString();
+                        change = meditation > 10 ? '+5min' : '--';
+                        trend = meditation > 10 ? 'up' : 'stable';
+                        break;
+                    case 'activity':
+                        const activity = data.activity ?? 0;
+                        value = activity.toString();
+                        change = activity > 30 ? '+5min' : '-5min';
+                        trend = activity > 30 ? 'up' : 'down';
+                        break;
+                }
+
+                return {
+                    ...metric,
+                    value,
+                    change,
+                    trend,
+                };
+            }));
+        } catch (error) {
+            console.error('Error updating health data:', error);
+        }
+    };
+
+    const handleConnectHealth = async () => {
+        try {
+            const service = Platform.OS === 'web' ? WebHealthService : HealthService;
+            const authorized = await service.requestPermissions();
+            if (authorized) {
+                setIsConnected(true);
+                Alert.alert('Success', `Successfully connected to ${Platform.OS === 'web' ? 'Google Fit' : 'Apple Health'}!`);
+            } else {
+                Alert.alert('Error', `Failed to get permission for ${Platform.OS === 'web' ? 'Google Fit' : 'Apple Health'}`);
+            }
+        } catch (error) {
+            console.error('Error connecting to health service:', error);
+            Alert.alert('Error', `Failed to connect to ${Platform.OS === 'web' ? 'Google Fit' : 'Apple Health'}`);
+        }
+    };
 
     const renderTrendIcon = (trend?: 'up' | 'down' | 'stable') => {
         switch (trend) {
@@ -126,28 +215,20 @@ const Health = () => {
         </TouchableOpacity>
     );
 
-    const handleConnectHealth = () => {
-        if (Platform.OS === 'ios') {
-            // Implement Apple Health connection
-            console.log('Connecting to Apple Health...');
-        } else {
-            // Implement Google Fit connection
-            console.log('Connecting to Google Fit...');
-        }
-    };
-
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Health Overview</Text>
-                <TouchableOpacity
-                    style={styles.connectButton}
-                    onPress={handleConnectHealth}
-                >
-                    <Text style={styles.connectButtonText}>
-                        Connect {Platform.OS === 'ios' ? 'Apple Health' : 'Google Fit'}
-                    </Text>
-                </TouchableOpacity>
+                {!isConnected && (
+                    <TouchableOpacity
+                        style={styles.connectButton}
+                        onPress={handleConnectHealth}
+                    >
+                        <Text style={styles.connectButtonText}>
+                            Connect {Platform.OS === 'ios' ? 'Apple Health' : 'Google Fit'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
             <ScrollView style={styles.scrollView}>
                 <View style={styles.gridContainer}>
