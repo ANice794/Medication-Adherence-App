@@ -5,12 +5,13 @@ const router = express.Router();
 
 router.post("/doctor/:doctorId/patient/:patientId", controller.createNewChat);
 router.get("/:userId", controller.getAllChats);
+router.get("/details/:chatId", controller.getChatById);
 router.get("/:chatId/messages", controller.getAllMessages);
 router.post("/:chatId/messages", controller.createNewMessage);
-router.delete("/messages/:messageId", controller.deleteMessage);
-router.put("/messages/delete/:messageId", controller.softDeleteMessage);
-router.put("/messages/edit/:messageId", controller.editMessage);
-router.put("/messages/read/:messageId", controller.markAsRead);
+router.delete("/:chatId/messages/:messageId", controller.deleteMessage);
+router.put("/:chatId/messages/:messageId/soft-delete", controller.softDeleteMessage);
+router.put("/:chatId/messages/:messageId", controller.editMessage);
+router.put("/:chatId/messages/:messageId/read", controller.markAsRead);
 router.get("/messages/read/:userId", controller.getAllReadMessages);
 router.get("/messages/unread/:userId", controller.getAllUnreadMessages);
 

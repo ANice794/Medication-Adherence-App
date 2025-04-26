@@ -237,20 +237,38 @@ const getCurrentPointsForPatient = async (req, res) => {
     let patientId = req.params.patientId;
 
     if (!patientId) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        return res.status(400).json({ 
+            success: false,
+            error: 'Missing patient ID' 
+        });
     }
 
     try {
+        // Check if points tracker exists
         const trackerExist = await model.pointTrackerExists(patientId);
         if (!trackerExist) {
+            console.log('Creating new points tracker for patient:', patientId);
             await model.addPointTrackerToPatient(patientId);
-            //res.json({ message: 'No points available for this patient' });
         }
+
+        // Get points data
         const points = await model.getCurrentPointsForPatient(patientId);
-        res.json(points);
+        
+        // Return formatted response
+        return res.json({
+            success: true,
+            data: {
+                current_points: points.current_points || 0,
+                overall_points: points.overall_points || 0
+            }
+        });
     } catch (error) {
-        console.error('Error fetching points for patient:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error in getCurrentPointsForPatient:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: 'Internal server error',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 
@@ -310,18 +328,18 @@ const addPointTrackerToPatient = async (req, res) => {
 
 const addReminder = async (req, res) => {
     let user_id = req.params.patientId;
-    let medication_name = req.body.medication_name;
+    let medication_id = req.body.medication_id;
     let dosage = req.body.dosage;
     let schedule_time = req.body.schedule_time;
     let frequency = req.body.frequency;
     let start_date = req.body.start_date;
     let end_date = req.body.end_date;
 
-    if (!user_id || !medication_name || !dosage || !schedule_time || !frequency || !start_date || !end_date) {
+    if (!user_id || !medication_id || !dosage || !schedule_time || !frequency || !start_date || !end_date) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    let newReminder = [user_id, medication_name, dosage, schedule_time, frequency, start_date, end_date];
+    let newReminder = [user_id, medication_id, dosage, schedule_time, frequency, start_date, end_date];
     try {
         const updatedPatient = await model.addReminderToPatient(newReminder);
         res.json(updatedPatient);

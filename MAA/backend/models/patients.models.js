@@ -101,7 +101,13 @@ const createNewChat = async (doctorId, patientId) => {
 
 const getAllDoctorsForOnePatient = async (patientId) => {
     try {
-        const result = await client.query('SELECT * FROM patient_and_doctor WHERE patient_id = $1', [patientId]);
+        const result = await client.query(`
+            SELECT u.id, u.first_name, u.last_name, u.email
+            FROM patient_and_doctor pad
+            JOIN users u ON pad.doctor_id = u.id
+            WHERE pad.patient_id = $1
+            ORDER BY u.last_name, u.first_name;
+        `, [patientId]);
         return result.rows; // Return the doctors for the patient
     } catch (error) {
         console.error('Error fetching doctors for patient:', error);
@@ -111,7 +117,7 @@ const getAllDoctorsForOnePatient = async (patientId) => {
 
 const addRewardToPatient = async (patientId, rewardId) => {
     try {
-        const result = await client.query('INSERT INTO user_rewards (patient_id, reward_id, redeemed_at, expiration_date) VALUES ($1, $2, $3, $4) RETURNING *;', [patientId, rewardId, "NOW()", "NOW() + interval \'3 day\'"]);
+        const result = await client.query('INSERT INTO user_rewards (user_id, reward_id, redeemed_at, expiration_date) VALUES ($1, $2, $3, $4) RETURNING *;', [patientId, rewardId, "NOW()", "NOW() + interval \'3 day\'"]);
         return result.rows; // Return the added reward for the patient
     } catch (error) {
         console.error('Error adding reward to patient:', error);
@@ -121,7 +127,7 @@ const addRewardToPatient = async (patientId, rewardId) => {
 
 const getAllRewardsForOnePatient = async (patientId) => {
     try {
-        const result = await client.query('SELECT * FROM user_rewards WHERE patient_id = $1', [patientId]);
+        const result = await client.query('SELECT * FROM user_rewards WHERE user_id = $1', [patientId]);
         return result.rows; // Return the rewards for the patient
     } catch (error) {
         console.error('Error fetching rewards for patient:', error);
@@ -131,7 +137,7 @@ const getAllRewardsForOnePatient = async (patientId) => {
 
 const removeRewardFromPatient = async (patientId, rewardId) => {
     try {
-        const result = await client.query('DELETE FROM user_rewards WHERE patient_id = $1 AND reward_id = $2 RETURNING *;', [patientId, rewardId]);
+        const result = await client.query('DELETE FROM user_rewards WHERE user_id = $1 AND reward_id = $2 RETURNING *;', [patientId, rewardId]);
         return result.rows; // Return the removed reward for the patient
     } catch (error) {
         console.error('Error removing reward from patient:', error);
@@ -201,8 +207,8 @@ const getAllPointsForPatient = async (patientId) => {
 
 const getCurrentPointsForPatient = async (patientId) => {
     try {
-        const result = await client.query('SELECT current_points FROM points WHERE user_id = $1;', [patientId]);
-        return result.rows; // Return the current points for the patient
+        const result = await client.query('SELECT current_points, overall_points FROM points WHERE user_id = $1;', [patientId]);
+        return result.rows[0] || { current_points: 0, overall_points: 0 }; // Return the points object with defaults
     } catch (error) {
         console.error('Error fetching current points for patient:', error);
         throw error; // Rethrow the error to be handled in the controller
@@ -212,7 +218,7 @@ const getCurrentPointsForPatient = async (patientId) => {
 const addReminderToPatient = async (newReminder) => {
     try {
         const result = await client.query(
-            'INSERT INTO reminders (user_id, medication_name, dosage, schedule_time, frequency, start_date, end_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;', newReminder
+            'INSERT INTO reminders (user_id, medication_id, dosage, schedule_time, frequency, start_date, end_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;', newReminder
         );
         return result.rows[0]; // Return the added reminder object
     } catch (error) {
@@ -223,7 +229,7 @@ const addReminderToPatient = async (newReminder) => {
 
 const getAllRemindersForOnePatient = async (patientId) => {
     try {
-        const result = await client.query('SELECT * FROM reminders WHERE user_id = $1;', [patientId]);
+        const result = await client.query('SELECT reminders.id, reminders.medication_id, medications.name, reminders.dosage, reminders.schedule_time, reminders.frequency, reminders.start_date, reminders.end_date FROM reminders JOIN medications ON reminders.medication_id = medications.id WHERE reminders.user_id = $1;', [patientId]);
         return result.rows; // Return the reminders for the patient
     } catch (error) {
         console.error('Error fetching reminders for patient:', error);
@@ -276,7 +282,7 @@ const getAdherenceForOnePatient = async (patientId) => {
 const addAdherenceForOnePatient = async (adherence) => {
     try {
         const result = await client.query(
-            'INSERT INTO adherence (user_id, reminder_id, schedule_for,points_awarded) VALUES ($1, $2, $3, $4) RETURNING *;', adherence
+            'INSERT INTO adherence (user_id, reminder_id, scheduled_for, points_awarded) VALUES ($1, $2, $3, $4) RETURNING *;', adherence
         );
         return result.rows[0]; // Return the added adherence object
     } catch (error) {
@@ -287,7 +293,7 @@ const addAdherenceForOnePatient = async (adherence) => {
 
 const updateAdherenceForOnePatient = async (patientId, adherenceId, updatedData) => {
     try {
-        const query = 'UPDATE adherence SET medication_name = $1, dosage = $2, schedule_time = $3, frequency = $4, start_date = $5, end_date = $6 WHERE user_id = $7 AND id = $8 RETURNING *;';
+        const query = 'UPDATE adherence SET medication_name = $1, dosage = $2, scheduled_for = $3, frequency = $4, start_date = $5, end_date = $6 WHERE user_id = $7 AND id = $8 RETURNING *;';
         const values = [updatedData.medication_name, updatedData.dosage, updatedData.schedule_time, updatedData.frequency, updatedData.start_date, updatedData.end_date, patientId, adherenceId];
         const result = await client.query(query, values);
         return result.rows; // Return the updated adherence object

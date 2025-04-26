@@ -207,6 +207,29 @@ const softDeleteMessage = async (req, res, next) => {
     }
 };
 
+const addPatientToDoctor = async (req, res) => {
+    const { doctorId, patientId } = req.params;
+
+    if (!doctorId || !patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        // First, check if the relationship already exists
+        const existingRelationship = await model.checkPatientDoctorRelationship(doctorId, patientId);
+        if (existingRelationship) {
+            return res.status(400).json({ error: 'Patient is already assigned to this doctor' });
+        }
+
+        // Add the patient to the doctor
+        const result = await model.addPatientToDoctor(doctorId, patientId);
+        res.status(201).json(result);
+    } catch (error) {
+        console.error('Error adding patient to doctor:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     addDoctor,
     getDoctors,
@@ -220,4 +243,5 @@ module.exports = {
     createNewMessage,
     softDeleteMessage,
     howManyPatientsPerDoctor,
+    addPatientToDoctor,
 };

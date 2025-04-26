@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { API_URL } from '../../config';
 
 interface FrequencyOption {
     value: string;
@@ -49,9 +51,29 @@ interface MedicationForm {
     name: string;
     dosage: string;
     frequency: string;
-    schedule_times: TimeFormat[];
+    scheduleTimes: TimeFormat[];
     route: string;
+    startDate: string;
+}
+
+interface MedicationResponse {
+    id: string;
+    name: string;
+    dosage: string;
+    route: string;
+    frequency: string;
+    startDate: string;
+}
+
+interface ReminderResponse {
+    id: string;
+    user_id: string;
+    medication_id: string;
+    dosage: string;
+    schedule_time: string;
+    frequency: string;
     start_date: string;
+    end_date: string;
 }
 
 // Add time options generation
@@ -70,22 +92,31 @@ const generateTimeOptions = () => {
 
 const TIME_OPTIONS = generateTimeOptions();
 
+interface ApiError {
+    response?: {
+        data: any;
+        status: number;
+    };
+    message: string;
+}
+
 export default function AddMedication() {
     const router = useRouter();
     const { id } = useUser();
-    console.log('User ID:', id);
-
+    const [loading, setLoading] = useState(false);
+    const [medicationResponse, setMedicationResponse] = useState<MedicationResponse | null>(null);
+    const [shouldCreateReminder, setShouldCreateReminder] = useState(false);
     const [medication, setMedication] = useState<MedicationForm>({
         name: '',
         dosage: '',
         frequency: FREQUENCY_OPTIONS[0].value,
-        schedule_times: [{
+        scheduleTimes: [{
             hour: '9',
             minute: '00',
             period: 'AM'
         }],
         route: '',
-        start_date: new Date().toISOString().split('T')[0]
+        startDate: new Date().toISOString().split('T')[0]
     });
 
     const getFrequencyDetails = (frequencyValue: string): FrequencyOption => {
@@ -106,7 +137,7 @@ export default function AddMedication() {
     }, [medication.frequency]);
 
     const handleTimeChange = (index: number, field: keyof TimeFormat, value: string) => {
-        const newTimes = [...medication.schedule_times];
+        const newTimes = [...medication.scheduleTimes];
         newTimes[index] = {
             ...newTimes[index],
             [field]: value
@@ -127,130 +158,332 @@ export default function AddMedication() {
         return `${hour.toString().padStart(2, '0')}:${time.minute}`;
     };
 
-    const validateTimes = (times: string[]): boolean => {
-        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        return times.every(time => timeRegex.test(time));
+    const createTimestamp = (date: string, time: string): string => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const timestamp = new Date(date);
+        timestamp.setHours(hours, minutes, 0, 0);
+        return timestamp.toISOString();
     };
 
-    const createReminder = async (medicationData: any) => {
+    const validateTimes = (times: TimeFormat[]): boolean => {
+        return times.every(time => {
+            const hour = parseInt(time.hour);
+            const minute = parseInt(time.minute);
+            
+            // Check if hour is between 1 and 12
+            if (hour < 1 || hour > 12) return false;
+            
+            // Check if minute is between 0 and 59
+            if (minute < 0 || minute > 59) return false;
+            
+            // Check if period is valid
+            if (time.period !== 'AM' && time.period !== 'PM') return false;
+            
+            return true;
+        });
+    };
+
+    const validateForm = () => {
+        // Validate required fields
+        console.log('Validating fields:', medication);
+        if (!medication.name || !medication.dosage || !medication.frequency || !medication.route || !medication.startDate) {
+            console.log('Missing required fields:', {
+                name: !!medication.name,
+                dosage: !!medication.dosage,
+                frequency: !!medication.frequency,
+                route: !!medication.route,
+                startDate: !!medication.startDate
+            });
+            Alert.alert('Error', 'Please fill in all required fields');
+            return false;
+        }
+
+        // Validate date format
+        const dateRegex = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+        if (!dateRegex.test(medication.startDate)) {
+            console.log('Invalid date format:', medication.startDate);
+            Alert.alert('Error', 'Please enter a valid date in YYYY-MM-DD format (e.g., 2024-03-25)');
+            return false;
+        }
+
+        // Additional date validation
+        const [year, month, day] = medication.startDate.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        if (
+            date.getFullYear() !== year ||
+            date.getMonth() !== month - 1 ||
+            date.getDate() !== day ||
+            date < new Date(new Date().setHours(0, 0, 0, 0))
+        ) {
+            console.log('Invalid date:', medication.startDate);
+            Alert.alert('Error', 'Please enter a valid date that is not in the past');
+            return false;
+        }
+
+        return true;
+    };
+
+    // Effect to handle reminder creation after medication response is set
+    useEffect(() => {
+        const handleReminderCreation = async () => {
+            if (medicationResponse && shouldCreateReminder) {
+                console.log('Medication response available, creating reminder...');
+                try {
+                    await createReminder(medicationResponse);
+                    Alert.alert('Success', 'Medication, reminders, and adherence records added successfully');
+                    router.back();
+                } catch (error) {
+                    console.error('Error creating reminder and adherence:', error);
+                    Alert.alert(
+                        'Partial Success',
+                        'Medication was added but there was an error creating the reminders and adherence records. Please try adding the reminders manually.'
+                    );
+                    router.back();
+                } finally {
+                    setShouldCreateReminder(false);
+                }
+            }
+        };
+
+        handleReminderCreation();
+    }, [medicationResponse, shouldCreateReminder]);
+
+    const verifyMedication = async (medicationId: string) => {
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while (attempts < maxAttempts) {
+            try {
+                console.log(`Verifying medication (attempt ${attempts + 1})...`);
+                const response = await axios.get<MedicationResponse>(`${API_URL}/medications/${medicationId}`);
+                if (response.data && response.data.id) {
+                    console.log('Medication verified:', response.data);
+                    return response.data;
+                }
+            } catch (error) {
+                console.log(`Verification attempt ${attempts + 1} failed, retrying...`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            attempts++;
+        }
+        throw new Error('Could not verify medication after multiple attempts');
+    };
+
+    const createReminder = async (newMedication: MedicationResponse) => {
+        console.log('Creating reminder...');
+        console.log('New Medication Data:', newMedication);
+
+        if (!newMedication || !newMedication.id) {
+            console.error('Invalid medication data:', newMedication);
+            return false;
+        }
+
         try {
-            const frequencyDetails = getFrequencyDetails(medication.frequency);
-            const reminderTimes = medication.schedule_times.map(time => {
-                const time24 = convertTo24Hour(time);
-                const [hours, minutes] = time24.split(':').map(Number);
-                const reminderDate = new Date(medication.start_date);
-                reminderDate.setHours(hours, minutes, 0, 0);
-                return reminderDate.toISOString();
+            console.log('=== Starting Reminder Creation Process ===');
+            console.log('Using Medication:', {
+                id: newMedication.id,
+                name: newMedication.name,
+                dosage: newMedication.dosage
             });
 
-            const reminderData = {
-                user_id: medicationData.user_id,
-                medication_name: medicationData.name,
-                dosage: medicationData.dosage,
-                schedule_times: reminderTimes,
-                frequency: {
-                    type: medication.frequency,
-                    times: frequencyDetails.times,
-                    intervalHours: frequencyDetails.intervalHours
-                },
-                start_date: medicationData.start_date,
-                end_date: null
-            };
+            const frequencyDetails = getFrequencyDetails(medication.frequency);
+            console.log('Frequency Details:', {
+                value: frequencyDetails.value,
+                label: frequencyDetails.label,
+                times: frequencyDetails.times,
+                intervalHours: frequencyDetails.intervalHours
+            });
 
-            const response = await axios.post(`http://localhost:3000/patients/${id}/reminders`, reminderData);
-            console.log('Reminder created:', response.data);
-            return response.data;
+            console.log('Original Schedule Times:', medication.scheduleTimes);
+
+            const reminderTimes = medication.scheduleTimes.map(time => {
+                const time24 = convertTo24Hour(time);
+                console.log('Converting time:', {
+                    original: time,
+                    converted: time24
+                });
+                return time24;
+            });
+
+            console.log('Converted Reminder Times:', reminderTimes);
+
+            // Calculate end date as 30 days from start date
+            const endDate = new Date(medication.startDate);
+            endDate.setDate(endDate.getDate() + 30);
+            const endDateStr = endDate.toISOString().split('T')[0];
+            
+            console.log('Date Range:', {
+                startDate: medication.startDate,
+                endDate: endDateStr,
+                totalDays: 30
+            });
+
+            // Create a reminder for each schedule time
+            for (const scheduleTime of reminderTimes) {
+                console.log('\n=== Creating Reminder for Schedule Time:', scheduleTime, '===');
+                
+                // Create reminder data object with all required fields
+                const reminderData = {
+                    user_id: id.toString(),
+                    medication_id: parseInt(newMedication.id),
+                    dosage: medication.dosage,
+                    schedule_time: scheduleTime,  // Keep as HH:mm for reminders
+                    frequency: medication.frequency,
+                    start_date: medication.startDate,
+                    end_date: endDateStr,
+                    status: "PENDING",
+                    type: "MEDICATION"
+                };
+
+                console.log('Creating reminder with data:', reminderData);
+
+                // Create the reminder
+                console.log('Making API request to create reminder...');
+                const reminderResponse = await axios.post<ReminderResponse>(
+                    `${API_URL}/patients/${id}/reminders`,
+                    reminderData
+                );
+
+                console.log('Reminder Creation Response:', {
+                    status: reminderResponse.status,
+                    data: reminderResponse.data
+                });
+
+                if (reminderResponse.data && reminderResponse.data.id) {
+                    // Create adherence record for this reminder
+                    const reminderId = reminderResponse.data.id;
+                    console.log('Creating adherence record for reminder ID:', reminderId);
+
+                    // Create a proper timestamp for the adherence record
+                    const scheduleForTimestamp = createTimestamp(medication.startDate, scheduleTime);
+
+                    const adherenceData = {
+                        reminder_id: reminderId,
+                        user_id: id.toString(),
+                        schedule_for: scheduleForTimestamp,  // Use full timestamp for adherence
+                        points_awarded: 10,
+                        taken: false,
+                        status: "PENDING"
+                    };
+                    
+                    console.log('Adherence Data to be sent:', adherenceData);
+                    
+                    console.log('Making API request to create adherence record...');
+                    const adherenceResponse = await axios.post(
+                        `${API_URL}/patients/${id}/reminders/${reminderId}/adherence`,
+                        adherenceData
+                    );
+
+                    console.log('Adherence Creation Response:', {
+                        status: adherenceResponse.status,
+                        data: adherenceResponse.data
+                    });
+                } else {
+                    throw new Error('No reminder ID in response');
+                }
+            }
+
+            console.log('\n=== Reminder Creation Process Completed Successfully ===');
+            return true;
         } catch (error) {
-            console.error('Error creating reminder:', error);
-            return null;
+            console.error('=== Error in Reminder Creation Process ===');
+            const apiError = error as ApiError;
+            console.error('Error details:', apiError.message);
+            if (apiError.response) {
+                console.error('Response data:', apiError.response.data);
+                console.error('Response status:', apiError.response.status);
+            }
+            throw error;
         }
     };
 
     const handleSubmit = async () => {
-        console.log('Starting medication submission...'); // Log submission start
+        if (!validateForm()) {
+            return;
+        }
+
+        if (!validateTimes(medication.scheduleTimes)) {
+            Alert.alert('Invalid Time', 'Please enter valid times in 12-hour format (e.g., 9:00 AM)');
+            return;
+        }
+
         try {
-            // Validate required fields
-            console.log('Validating fields:', medication); // Log current medication data
-            if (!medication.name || !medication.dosage || !medication.frequency || !medication.route || !medication.start_date) {
-                console.log('Missing required fields:', {
-                    name: !!medication.name,
-                    dosage: !!medication.dosage,
-                    frequency: !!medication.frequency,
-                    route: !!medication.route,
-                    start_date: !!medication.start_date
-                });
-                Alert.alert('Error', 'Please fill in all required fields');
-                return;
-            }
-
-            // Validate all time inputs
-            if (!validateTimes(medication.schedule_times.map(time => `${time.hour}:${time.minute} ${time.period}`))) {
-                console.log('Invalid time format');
-                Alert.alert('Error', 'Please enter valid times in HH:MM format');
-                return;
-            }
-
-            // Validate date format
-            console.log('Validating date format:', medication.start_date);
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            if (!dateRegex.test(medication.start_date)) {
-                console.log('Invalid date format');
-                Alert.alert('Error', 'Please enter a valid date in YYYY-MM-DD format');
-                return;
-            }
+            setLoading(true);
 
             const medicationData = {
-                user_id: id,
+                patientId: id,
                 name: medication.name,
                 dosage: medication.dosage,
                 route: medication.route,
                 frequency: medication.frequency,
-                start_date: new Date(medication.start_date).toISOString(),
+                startDate: medication.startDate,
                 source: "manual"
             };
+
             console.log('Prepared medication data:', medicationData);
 
-            const API_URL = 'http://localhost:3000';
-            console.log('Sending POST request to:', `${API_URL}/medications`);
+            // Create medication
+            const response = await axios.post<{ message: string; data: MedicationResponse }>(
+                `${API_URL}/medications/patients/${id}`,
+                medicationData
+            );
             
-            try {
-                console.log('Making API request...');
-                const response = await axios.post(`${API_URL}/medications`, medicationData);
-                console.log('API Response:', response.status, response.data);
-                
-                if (response.status === 201) {
-                    console.log('Medication added successfully');
-                    
-                    // Create reminder for the medication
-                    await createReminder(medicationData);
-                    
-                    Alert.alert('Success', 'Medication and reminder added successfully');
-                    router.back();
-                } else {
-                    console.log('Unexpected response status:', response.status);
-                    throw new Error('Failed to add medication');
+            console.log('Medication API Response:', response.status, response.data);
+            
+            if (response.status === 201 && response.data.data) {
+                console.log('Medication added successfully');
+                console.log('New medication created:', response.data.data);
+
+                // Add a delay before creating reminders
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const newMedicationId = parseInt(response.data.data.id);
+                if (isNaN(newMedicationId)) {
+                    throw new Error('Invalid medication ID in response');
                 }
-            } catch (apiError) {
-                console.error('API call failed:', {
-                    error: apiError,
-                    request: apiError?.request,
-                    response: apiError?.response,
-                    config: apiError?.config
-                });
-                throw apiError; // Re-throw to be caught by outer catch block
+
+                // Get the latest medication data
+                try {
+                    const getMedicationResponse = await axios.get<MedicationResponse>(
+                        `${API_URL}/medications/${newMedicationId}`
+                    );
+                    
+                    console.log('Retrieved medication data:', getMedicationResponse.data);
+
+                    if (getMedicationResponse.data && getMedicationResponse.data.id) {
+                        // Create reminders with the fetched medication data
+                        const reminderCreated = await createReminder(getMedicationResponse.data);
+                        
+                        if (reminderCreated) {
+                            Alert.alert('Success', 'Medication, reminders, and adherence records added successfully');
+                            router.back();
+                        } else {
+                            Alert.alert(
+                                'Partial Success',
+                                'Medication was added but there was an error creating the reminders and adherence records. Please try adding the reminders manually.'
+                            );
+                            router.back();
+                        }
+                    } else {
+                        throw new Error('Could not retrieve medication data');
+                    }
+                } catch (error) {
+                    console.error('Error creating reminder and adherence:', error);
+                    Alert.alert(
+                        'Partial Success',
+                        'Medication was added but there was an error creating the reminders and adherence records. Please try adding the reminders manually.'
+                    );
+                    router.back();
+                }
+            } else {
+                console.log('Unexpected response status or missing data:', response.status, response.data);
+                throw new Error('Failed to add medication');
             }
-        } catch (error: unknown) {
-            console.error('Error in handleSubmit:', {
-                error,
-                errorType: typeof error,
-                errorMessage: error instanceof Error ? error.message : 'Unknown error',
-                errorStack: error instanceof Error ? error.stack : undefined
-            });
-            
-            const errorMessage = error && typeof error === 'object' && 'response' in error
-                ? (error.response as any)?.data?.error || 'Failed to add medication. Please try again.'
-                : 'Failed to add medication. Please try again.';
-            Alert.alert('Error', errorMessage);
+        } catch (error) {
+            console.error('Error in medication creation:', error);
+            Alert.alert('Error', 'Failed to add medication. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -317,10 +550,10 @@ export default function AddMedication() {
                         </View>
                     </View>
 
-                    {medication.schedule_times.map((time, index) => (
+                    {medication.scheduleTimes.map((time, index) => (
                         <View key={index} style={styles.inputGroup}>
                             <Text style={styles.label}>
-                                Schedule Time {medication.schedule_times.length > 1 ? `#${index + 1} ` : ''}*
+                                Schedule Time {medication.scheduleTimes.length > 1 ? `#${index + 1} ` : ''}*
                             </Text>
                             <View style={styles.timePickerContainer}>
                                 <View style={[styles.pickerContainer, styles.hourPicker]}>
@@ -374,11 +607,11 @@ export default function AddMedication() {
                     ))}
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Start Date *</Text>
+                        <Text style={styles.label}>Start Date * (YYYY-MM-DD)</Text>
                         <TextInput
                             style={styles.input}
-                            value={medication.start_date}
-                            onChangeText={(text) => setMedication({ ...medication, start_date: text })}
+                            value={medication.startDate}
+                            onChangeText={(text) => setMedication({ ...medication, startDate: text })}
                             placeholder="YYYY-MM-DD"
                             keyboardType="numbers-and-punctuation"
                         />
@@ -395,7 +628,7 @@ export default function AddMedication() {
         </View>
     );
 }
-
+    
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -483,4 +716,4 @@ const styles = StyleSheet.create({
         marginHorizontal: 5,
         color: '#333'
     },
-}); 
+});

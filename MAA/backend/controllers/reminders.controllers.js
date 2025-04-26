@@ -6,7 +6,7 @@ const addReminder = async (req, res) => {
             return res.status(400).json({ error: 'Request body is undefined' });
         }
         let user_id = req.body.user_id;
-        let medication_name = req.body.medication_name;
+        let medication_id = req.body.medication_id;
         let dosage = req.body.dosage;
         let schedule_time = req.body.schedule_time;
         let frequency = req.body.frequency;
@@ -14,11 +14,11 @@ const addReminder = async (req, res) => {
         let end_date = req.body.end_date;
 
         // Validate input data
-        if (!user_id || !medication_name || !dosage || !schedule_time || !frequency || !start_date || !end_date) {
+        if (!user_id || !medication_id|| !dosage || !schedule_time || !frequency || !start_date || !end_date) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        let newReminder = [user_id, medication_name, dosage, schedule_time, frequency, start_date, end_date];
+        let newReminder = [user_id, medication_id, dosage, schedule_time, frequency, start_date, end_date];
 
         const addedReminder = await model.addReminder(newReminder);
         res.status(201).json(addedReminder);

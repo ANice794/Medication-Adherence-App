@@ -34,53 +34,54 @@ const SignUp = () => {
     const router = useRouter();
     const { setUser: setContextUser } = useUser();
 
-    async function handleSubmit(event: { preventDefault: () => void; }) {
-        event.preventDefault();
+    const handleSubmit = async () => {
         console.log('Registration submitted with:', { email, password, firstName, lastName, dob });
         try {
-            const response = await axios.post<User[]>(`${API_URL}/register`, {
+            const response = await axios.post(`${API_URL}/register`, {
                 dob,
                 email,
                 firstName,
                 lastName,
                 password,
             });
-            const array = response.data;
-            console.log('Registration successful:', array);
-            console.log('Response data type:', typeof array);
-            console.log('Response data keys:', Object.keys(array[0]));
             
-            const userData = array[0] as any;
-            const firstNameValue = userData.firstName || userData.first_name;
-            const lastNameValue = userData.lastName || userData.last_name;
+            console.log('Registration response:', response.data);
+            
+            // Handle single user object response
+            const userData = response.data;
+            if (!userData) {
+                throw new Error('No user data received from server');
+            }
+
+            const firstNameValue = userData.firstName || userData.first_name || firstName;
+            const lastNameValue = userData.lastName || userData.last_name || lastName;
             const roleValue = userData.role || userData.roles || 'patient';
             
-            console.log('firstName value:', firstNameValue);
-            console.log('lastName value:', lastNameValue);
-            console.log('Full userData object:', JSON.stringify(userData, null, 2));
-            
-            Alert.alert('Success', 'Registration successful!');
+            console.log('Processed user data:', {
+                firstName: firstNameValue,
+                lastName: lastNameValue,
+                role: roleValue
+            });
             
             // Store user details in AsyncStorage
-            console.log('Storing user data in AsyncStorage...');
             await AsyncStorage.setItem('isLoggedIn', 'true');
-            await AsyncStorage.setItem('email', userData.email);
-            await AsyncStorage.setItem('password', userData.password);
+            await AsyncStorage.setItem('email', userData.email || email);
+            await AsyncStorage.setItem('password', userData.password || password);
             await AsyncStorage.setItem('firstName', firstNameValue);
             await AsyncStorage.setItem('lastName', lastNameValue);
-            await AsyncStorage.setItem('dob', userData.dob);
-            await AsyncStorage.setItem('id', userData.id.toString());
+            await AsyncStorage.setItem('dob', userData.dob || dob);
+            await AsyncStorage.setItem('id', userData.id?.toString() || '0');
             await AsyncStorage.setItem('role', roleValue);
             await AsyncStorage.setItem('profilePicture', userData.profilePicture || '');
 
             // Update the UserContext
             setContextUser({
-                id: userData.id,
-                email: userData.email,
-                password: userData.password,
+                id: userData.id || 0,
+                email: userData.email || email,
+                password: userData.password || password,
                 firstName: firstNameValue,
                 lastName: lastNameValue,
-                dob: userData.dob,
+                dob: userData.dob || dob,
                 role: roleValue,
                 profilePicture: userData.profilePicture || '',
                 isLoggedIn: true,
@@ -96,32 +97,17 @@ const SignUp = () => {
                 setUser: () => {},
             });
             
-            // Verify data was stored correctly
-            console.log('Verifying stored data...');
-            const storedIsLoggedIn = await AsyncStorage.getItem('isLoggedIn');
-            const storedEmail = await AsyncStorage.getItem('email');
-            const storedFirstName = await AsyncStorage.getItem('firstName');
-            const storedLastName = await AsyncStorage.getItem('lastName');
-            const storedDob = await AsyncStorage.getItem('dob');
-            const storedId = await AsyncStorage.getItem('id');
-            const storedRole = await AsyncStorage.getItem('role');
-            
-            console.log('Stored data verification:');
-            console.log('isLoggedIn:', storedIsLoggedIn);
-            console.log('email:', storedEmail);
-            console.log('firstName:', storedFirstName);
-            console.log('lastName:', storedLastName);
-            console.log('dob:', storedDob);
-            console.log('id:', storedId);
-            console.log('role:', storedRole);
-            
+            Alert.alert('Success', 'Registration successful!');
             setIsLoggedIn(true);
             router.replace('/(root)/(tabs)');
         } catch (error) {
             console.error('Registration error:', error);
-            Alert.alert('Error', 'Registration failed. Please try again.');
+            Alert.alert(
+                'Error', 
+                'Registration failed. Please check your information and try again.'
+            );
         }
-    }
+    };
 
     return (
         <View style={styles.container}>
@@ -130,49 +116,54 @@ const SignUp = () => {
                 <TextInput
                     style={styles.input}
                     placeholder="First Name"
+                    value={firstName}
+                    onChangeText={setFirstName}
                     keyboardType="default"
                     autoComplete='given-name'
-                    onChange={e => setFirstName(e.nativeEvent.text)}
                 />
             </View>
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.input}
                     placeholder="Last Name"
+                    value={lastName}
+                    onChangeText={setLastName}
                     keyboardType="default"
                     autoComplete='family-name'
-                    onChange={e => setLastName(e.nativeEvent.text)}
                 />
             </View>
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.input}
                     placeholder="Email"
+                    value={email}
+                    onChangeText={setEmail}
                     keyboardType="email-address"
                     autoComplete='email'
-                    onChange={e => setEmail(e.nativeEvent.text)}
                 />
             </View>
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.input}
                     placeholder="Password"
+                    value={password}
+                    onChangeText={setPassword}
                     secureTextEntry
-                    onChange={e => setPassword(e.nativeEvent.text)}
                 />
             </View>
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.input}
                     placeholder="Date of Birth (YYYY-MM-DD)"
+                    value={dob}
+                    onChangeText={setDob}
                     keyboardType="default"
                     autoComplete='birthdate-full'
-                    onChange={e => setDob(e.nativeEvent.text)}
                 />
             </View>
             <TouchableOpacity
                 style={styles.button}
-                onPress={(e) => handleSubmit(e)}
+                onPress={handleSubmit}
             >
                 <Text style={styles.buttonText}>Sign Up</Text>
             </TouchableOpacity>

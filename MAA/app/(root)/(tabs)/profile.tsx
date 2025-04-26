@@ -32,6 +32,15 @@ const Profile = () => {
             dob: '',
             role: '',
             profilePicture: '',
+            points: 0,
+            streak: 0,
+            activeItems: [],
+            currentTheme: {
+                primary: '#4A90E2',
+                background: '#f5f5f5',
+                text: '#333333',
+                secondary: '#666666',
+            },
             isLoggedIn: false,
             setId: () => {},
             setEmail: () => {},
@@ -41,6 +50,16 @@ const Profile = () => {
             setDob: () => {},
             setRole: () => {},
             setProfilePicture: () => {},
+            setPoints: () => {},
+            addPoints: () => {},
+            deductPoints: () => {},
+            setStreak: () => {},
+            incrementStreak: () => {},
+            resetStreak: () => {},
+            setActiveItems: () => {},
+            addActiveItem: () => {},
+            hasActiveItem: () => false,
+            setTheme: () => {},
             setIsLoggedIn: () => {},
             setUser: () => {},
         });
@@ -70,8 +89,21 @@ const Profile = () => {
         <ScrollView style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.profileImageContainer}>
-                   <Ionicons name="person-circle-outline" size={200} color="black" />
-                    <TouchableOpacity style={styles.editImageButton}>
+                    {profilePicture ? (
+                        <Image 
+                            source={{ uri: profilePicture }} 
+                            style={styles.profileImage}
+                        />
+                    ) : (
+                        <Ionicons name="person-circle-outline" size={200} color="black" />
+                    )}
+                    <TouchableOpacity 
+                        style={styles.editImageButton}
+                        onPress={() => {
+                            // TODO: Implement image picker functionality
+                            console.log('Edit profile picture pressed');
+                        }}
+                    >
                         <Ionicons name="camera" size={20} color="#fff" />
                     </TouchableOpacity>
                 </View>

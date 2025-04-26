@@ -1,60 +1,53 @@
-const { Client } = require('pg');
-const express = require('express');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+require('dotenv').config();
+const { Pool } = require('pg');
 
-const client = new Client({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'MAA',
-    password: 'P@$$w0rd',
-    port: 5432,
+console.log('Initializing database connection pool with config:', {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 5432,
+    database: process.env.DB_NAME || 'MAA',
+    user: process.env.DB_USER || 'postgres',
+    // Not logging password for security
 });
 
-client.connect()
-    .then(() => {
-        console.log('Connected to PostgreSQL database');
-        // Test query to ensure the connection works
-        return client.query('SELECT NOW() + interval \'3 day\' AS "current_time_plus_3_days"');
+const client = new Pool({
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'P@$$w0rd',
+    database: process.env.DB_NAME || 'MAA',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 5432,
+    // Add error handling configurations
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    max: 20
+});
 
-    })
-    .then(result => console.log('Database test query result:', result.rows[0]))
-    .catch(err => {
-        console.error('Connection error', err.stack); // Log the error stack
-        process.exit(1); // Exit the process if the connection fails
-    });
+// Log pool events
+client.on('connect', () => {
+    console.log('New client connected to the pool');
+});
 
-const router = express.Router();
-const SECRET_KEY = 'your_secret_key'; // Replace with a secure key
+client.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+});
 
-// Login route
-router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-
+// Test the connection
+const testConnection = async () => {
     try {
-        // Check if user exists
-        const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
-        if (result.rows.length === 0) {
-            return res.status(401).json({ message: 'Invalid username or password' });
-        }
-
-        const user = result.rows[0];
-
-        // Compare passwords
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid username or password' });
-        }
-
-        // Generate JWT token
-        const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: '1h' });
-
-        res.json({ token });
+        console.log('Testing database connection...');
+        const conn = await client.connect();
+        console.log('Successfully connected to PostgreSQL database');
+        conn.release();
+        return true;
     } catch (err) {
-        console.error('Error during login:', err);
-        res.status(500).json({ message: 'Internal server error' });
+        console.error('Error connecting to PostgreSQL:', {
+            message: err.message,
+            code: err.code,
+            stack: err.stack
+        });
+        return false;
     }
-});
+};
 
-module.exports = router;
+testConnection();
+
 module.exports = client;

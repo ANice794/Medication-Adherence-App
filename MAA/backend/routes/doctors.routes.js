@@ -10,6 +10,7 @@ router.get("/:doctorId", controller.getOneDoctor);
 router.put("/:doctorId", controller.updateDoctor);
 router.delete("/:doctorId", controller.deleteDoctor);
 router.get("/:doctorId/patients/count", controller.howManyPatientsPerDoctor);
+router.post("/:doctorId/patients/:patientId", controller.addPatientToDoctor);
 
 
 module.exports = router;

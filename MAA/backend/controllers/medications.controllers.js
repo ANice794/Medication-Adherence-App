@@ -1,4 +1,6 @@
 const model = require('../models/medications.models');
+const { epicService } = require('../services/epicService');
+const { createMedication: createMedicationModel } = require('../models/medications.models');
 
 const getAllMedications = async (req, res) => {
     try {
@@ -10,34 +12,38 @@ const getAllMedications = async (req, res) => {
     }
 };
 
-const addMedication = async (req, res) => {
-    if (!req.body) {
-        return res.status(400).json({ error: 'Request body is undefined' });
-    }
-
-    let user_id = req.body.user_id;
-    let fhir_medication_id = req.body.fhir_medication_id || null;
-    let name = req.body.name;
-    let dosage = req.body.dosage;
-    let route = req.body.route;
-    let frequency = req.body.frequency;
-    let start_date = req.body.start_date;
-    let end_date = req.body.end_date || null;
-    let source = req.body.source;
-
-    // Validate input data
-    if (!name || !dosage || !frequency || !start_date || !user_id || !route || !source) {
-        return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    let newMedication = [user_id, fhir_medication_id, name, dosage, route, frequency, start_date, end_date, source, "NOW()"];
-
+const createMedication = async (req, res) => {
     try {
-        const addedMedication = await model.addMedication(newMedication);
-        res.status(201).json(addedMedication);
+        const { name, dosage, frequency, route, startDate, patientId } = req.body;
+
+        // Create the medication
+        const result = await createMedicationModel({
+            name,
+            dosage,
+            frequency,
+            route,
+            startDate,
+            patientId
+        });
+
+        if (!result) {
+            return res.status(400).json({
+                error: 'Failed to create medication',
+                details: 'Could not create medication record'
+            });
+        }
+
+        return res.status(201).json({
+            message: 'Medication created successfully',
+            data: result
+        });
+
     } catch (error) {
-        console.error('Error adding medication:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error creating medication:', error);
+        return res.status(500).json({
+            error: 'Internal server error',
+            details: error.message
+        });
     }
 };
 
@@ -112,19 +118,38 @@ const getAllMedicationsForOnePatient = async (req, res) => {
 };
 
 const addMedicationForOnePatient = async (req, res) => {
-    let patientId = req.params.patientId;
-    let medicationId = req.body.medicationId;
-
-    if (!patientId || !medicationId) {
-        return res.status(400).json({ error: 'Missing required fields' });
-    }
-
     try {
-        const addedMedication = await model.addMedicationForOnePatient(patientId, medicationId);
-        res.status(201).json(addedMedication);
+        const { patientId } = req.params;
+        const { name, dosage, frequency, route, startDate } = req.body;
+
+        // Create the medication for the specific patient
+        const result = await createMedicationModel({
+            name,
+            dosage,
+            frequency,
+            route,
+            startDate,
+            patientId: parseInt(patientId)
+        });
+
+        if (!result) {
+            return res.status(400).json({
+                error: 'Failed to add medication',
+                details: 'Could not add medication for the patient'
+            });
+        }
+
+        return res.status(201).json({
+            message: 'Medication added successfully',
+            data: result
+        });
+
     } catch (error) {
-        console.error('Error adding medication for patient:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error adding medication:', error);
+        return res.status(500).json({
+            error: 'Internal server error',
+            details: error.message
+        });
     }
 };
 
@@ -185,9 +210,25 @@ const deleteMedicationForOnePatient = async (req, res) => {
     }
 };
 
+const getMedicationsByPatientId = async (req, res) => {
+    let patientId = req.params.patientId;
+
+    if (!patientId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const medications = await model.getMedicationsByPatientId(patientId);
+        res.json(medications);
+    } catch (error) {
+        console.error('Error fetching medications by patient ID:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     getAllMedications,
-    addMedication,
+    createMedication,
     getOneMedication,
     addMedicationForOnePatient,
     updateMedication,
@@ -195,5 +236,6 @@ module.exports = {
     getAllMedicationsForOnePatient,
     getOneMedicationForOnePatient,
     updateMedicationForOnePatient,
-    deleteMedicationForOnePatient
+    deleteMedicationForOnePatient,
+    getMedicationsByPatientId
 };

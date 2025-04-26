@@ -38,7 +38,13 @@ const getOneDoctor = async (doctorId) => {
 
 const getAllPatientsForOneDoctor = async (doctorId) => {
     try {
-        const result = await client.query('SELECT * FROM patient_and_doctor WHERE doctor_id = $1', [doctorId]);
+        const result = await client.query(`
+            SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.date_of_birth, u.gender
+            FROM patient_and_doctor pad
+            JOIN users u ON pad.patient_id = u.id
+            WHERE pad.doctor_id = $1
+            ORDER BY u.last_name, u.first_name;
+        `, [doctorId]);
         return result.rows;
     } catch (error) {
         console.error('Error fetching patients for doctor:', error);
@@ -138,6 +144,32 @@ const softDeleteMessage = async (messageId) => {
     }
 };
 
+const checkPatientDoctorRelationship = async (doctorId, patientId) => {
+    try {
+        const result = await client.query(
+            'SELECT * FROM patient_and_doctor WHERE doctor_id = $1 AND patient_id = $2',
+            [doctorId, patientId]
+        );
+        return result.rows.length > 0;
+    } catch (error) {
+        console.error('Error checking patient-doctor relationship:', error);
+        throw error;
+    }
+};
+
+const addPatientToDoctor = async (doctorId, patientId) => {
+    try {
+        const result = await client.query(
+            'INSERT INTO patient_and_doctor (doctor_id, patient_id) VALUES ($1, $2) RETURNING *',
+            [doctorId, patientId]
+        );
+        return result.rows[0];
+    } catch (error) {
+        console.error('Error adding patient to doctor:', error);
+        throw error;
+    }
+};
+
 module.exports = { 
     createDoctor, 
     getAllDoctors,
@@ -151,5 +183,7 @@ module.exports = {
     getAllMessages, 
     createNewChat, 
     createNewMessage, 
-    softDeleteMessage 
+    softDeleteMessage,
+    checkPatientDoctorRelationship,
+    addPatientToDoctor
 };

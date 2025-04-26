@@ -1,13 +1,55 @@
 {
   "expo": {
-    "web": {
-      "config": {
-        "googleFit": {
-          "clientId": "165063434271-t863cqbhj01k2b7eaf7879buanus2qmn.apps.googleusercontent.com",
-          "apiKey": "AIzaSyDu-EDXZw4a30QSbaLB7FaIyI0kj5Ek17"
-        }
+    "name": "MAA",
+    "slug": "MAA",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.maf.maa",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "We need access to your health data to track your fitness metrics",
+        "NSHealthUpdateUsageDescription": "We need access to your health data to track your fitness metrics"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
       },
+      "package": "com.maf.maa",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
       "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.165063434271-t863cqbhj01k2b7eaf7879buanus2qmn"
+        }
+      ]
+    ],
+    "extra": {
+      "googleFit": {
+        "clientId": "165063434271-t863cqbhj01k2b7eaf7879buanus2qmn.apps.googleusercontent.com",
+        "apiKey": "AIzaSyDu-EDXZw4a30QSbaLB7FaIyI0kj5Ek17"
+      }
     }
   }
 } 

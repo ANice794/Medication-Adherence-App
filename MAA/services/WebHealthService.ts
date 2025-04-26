@@ -1,10 +1,17 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 declare global {
     interface Window {
         gapi: any;
         google: any;
     }
+}
+
+interface SleepSampleResponse {
+    startDate: string;
+    endDate: string;
+    value: number;
 }
 
 export interface HealthData {
@@ -16,60 +23,100 @@ export interface HealthData {
     activity: number;
 }
 
+interface SleepData {
+    startTimeMillis: string;
+    endTimeMillis: string;
+    value: number;
+}
+
 class WebHealthService {
     private isAuthorized = false;
     private accessToken: string | null = null;
-    private readonly API_KEY = process.env.EXPO_PUBLIC_GOOGLE_FIT_API_KEY;
-    private readonly CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+    private readonly API_KEY = Constants.expoConfig?.extra?.googleFit?.apiKey;
+    private readonly CLIENT_ID = Constants.expoConfig?.extra?.googleFit?.clientId;
     private readonly SCOPES = [
         'https://www.googleapis.com/auth/fitness.activity.read',
+        'https://www.googleapis.com/auth/fitness.body.read',
         'https://www.googleapis.com/auth/fitness.heart_rate.read',
-        'https://www.googleapis.com/auth/fitness.sleep.read',
-        'https://www.googleapis.com/auth/fitness.body.read'
+        'https://www.googleapis.com/auth/fitness.sleep.read'
     ].join(' ');
+
+    constructor() {
+        if (Platform.OS === 'web') {
+            console.log('Initializing WebHealthService with:', {
+                apiKey: this.API_KEY,
+                clientId: this.CLIENT_ID
+            });
+            this.initializeGoogleFit();
+        }
+    }
 
     async requestPermissions(): Promise<boolean> {
         if (Platform.OS !== 'web') {
-            console.log('Web health service is only available on web platforms');
+            console.log('Web Health Service is only available on web');
+            return false;
+        }
+
+        if (!this.API_KEY || !this.CLIENT_ID) {
+            console.error('Google Fit configuration missing:', {
+                apiKey: this.API_KEY,
+                clientId: this.CLIENT_ID,
+                config: Constants.expoConfig?.extra?.googleFit
+            });
             return false;
         }
 
         try {
-            // Load both required scripts
-            await Promise.all([
-                this.loadScript('https://apis.google.com/js/platform.js'),
-                this.loadScript('https://accounts.google.com/gsi/client')
-            ]);
-
-            // Initialize the client
-            await this.initializeGoogleSignIn();
-            
-            // Sign in the user
-            const result = await new Promise((resolve, reject) => {
-                window.google.accounts.oauth2.initTokenClient({
-                    client_id: this.CLIENT_ID,
-                    scope: this.SCOPES,
-                    callback: (response: any) => {
-                        if (response.access_token) {
-                            this.accessToken = response.access_token;
-                            this.isAuthorized = true;
-                            resolve(true);
-                        } else {
-                            reject(new Error('Failed to get access token'));
-                        }
-                    },
-                }).requestAccessToken();
+            await this.initializeGoogleFit();
+            const client = window.google.accounts.oauth2.initTokenClient({
+                client_id: this.CLIENT_ID,
+                scope: this.SCOPES,
+                callback: (tokenResponse: any) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        this.accessToken = tokenResponse.access_token;
+                        this.isAuthorized = true;
+                        console.log('Successfully authorized with Google Fit');
+                    }
+                },
             });
 
-            return result as boolean;
+            return new Promise((resolve) => {
+                client.requestAccessToken();
+                const checkAuth = setInterval(() => {
+                    if (this.isAuthorized) {
+                        clearInterval(checkAuth);
+                        resolve(true);
+                    }
+                }, 100);
+
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    clearInterval(checkAuth);
+                    resolve(false);
+                }, 30000);
+            });
         } catch (error) {
             console.error('Error requesting health permissions:', error);
             return false;
         }
     }
 
+    private async initializeGoogleFit(): Promise<void> {
+        if (!window.gapi) {
+            await this.loadScript('https://apis.google.com/js/api.js');
+        }
+        if (!window.google) {
+            await this.loadScript('https://accounts.google.com/gsi/client');
+        }
+    }
+
     private loadScript(src: string): Promise<void> {
         return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${src}"]`)) {
+                resolve();
+                return;
+            }
+
             const script = document.createElement('script');
             script.src = src;
             script.async = true;
@@ -77,28 +124,6 @@ class WebHealthService {
             script.onload = () => resolve();
             script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
             document.body.appendChild(script);
-        });
-    }
-
-    private async initializeGoogleSignIn(): Promise<void> {
-        return new Promise((resolve) => {
-            if (window.google?.accounts) {
-                resolve();
-                return;
-            }
-            
-            const checkGoogleExists = setInterval(() => {
-                if (window.google?.accounts) {
-                    clearInterval(checkGoogleExists);
-                    resolve();
-                }
-            }, 100);
-
-            // Set a timeout to prevent infinite checking
-            setTimeout(() => {
-                clearInterval(checkGoogleExists);
-                resolve();
-            }, 10000);
         });
     }
 
@@ -115,11 +140,13 @@ class WebHealthService {
                 steps,
                 heartRate,
                 sleep,
+                oxygenSaturation,
                 activity
             ] = await Promise.all([
                 this.getSteps(startTimeMillis, endTimeMillis),
                 this.getHeartRate(startTimeMillis, endTimeMillis),
                 this.getSleepHours(startTimeMillis, endTimeMillis),
+                this.getOxygenSaturation(startTimeMillis, endTimeMillis),
                 this.getActivityMinutes(startTimeMillis, endTimeMillis)
             ]);
 
@@ -127,7 +154,7 @@ class WebHealthService {
                 steps,
                 heartRate,
                 sleep,
-                oxygenSaturation: 0, // Not available in Google Fit
+                oxygenSaturation,
                 meditation: 0, // Not available in Google Fit
                 activity
             };
@@ -199,8 +226,13 @@ class WebHealthService {
 
     private async getSleepHours(startTimeMillis: number, endTimeMillis: number): Promise<number> {
         try {
+            if (!this.accessToken) {
+                console.error('Not authorized to access Google Fit data');
+                return 0;
+            }
+
             const response = await fetch(
-                `https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate`,
+                'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
                 {
                     method: 'POST',
                     headers: {
@@ -221,9 +253,48 @@ class WebHealthService {
 
             const data = await response.json();
             const sleepMinutes = data.bucket?.[0]?.dataset?.[0]?.point?.[0]?.value?.[0]?.intVal || 0;
-            return Math.round((sleepMinutes / 60) * 10) / 10; // Convert to hours and round to 1 decimal
+            const hours = Math.round((sleepMinutes / 60) * 10) / 10; // Convert to hours and round to 1 decimal
+            console.log('Total web sleep hours:', hours);
+            return hours;
         } catch (error) {
-            console.error('Error fetching sleep data:', error);
+            console.error('Error fetching web sleep data:', error);
+            return 0;
+        }
+    }
+
+    private async getOxygenSaturation(startTimeMillis: number, endTimeMillis: number): Promise<number> {
+        try {
+            if (!this.accessToken) {
+                console.error('Not authorized to access Google Fit data');
+                return 0;
+            }
+
+            const response = await fetch(
+                'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        aggregateBy: [{
+                            dataTypeName: "com.google.oxygen_saturation",
+                            dataSourceId: "derived:com.google.oxygen_saturation:com.google.android.gms:merge_oxygen_saturation"
+                        }],
+                        bucketByTime: { durationMillis: 86400000 },
+                        startTimeMillis,
+                        endTimeMillis
+                    })
+                }
+            );
+
+            const data = await response.json();
+            const oxygenValue = data.bucket?.[0]?.dataset?.[0]?.point?.[0]?.value?.[0]?.fpVal || 0;
+            console.log('Web oxygen saturation data:', oxygenValue);
+            return Math.round(oxygenValue);
+        } catch (error) {
+            console.error('Error fetching web oxygen saturation:', error);
             return 0;
         }
     }

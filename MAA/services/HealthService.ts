@@ -1,5 +1,7 @@
 import GoogleFit, { Scopes, AuthorizeOptions, StartAndEndDate } from 'react-native-google-fit';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 export interface HealthData {
     steps: number;
@@ -34,26 +36,49 @@ interface CalorieResponse {
 
 class HealthService {
     private isAuthorized = false;
+    private readonly CLIENT_ID = Constants.expoConfig?.extra?.googleFit?.clientId;
+
+    constructor() {
+        if (Platform.OS !== 'web') {
+            GoogleSignin.configure({
+                scopes: [
+                    'https://www.googleapis.com/auth/fitness.activity.read',
+                    'https://www.googleapis.com/auth/fitness.body.read',
+                    'https://www.googleapis.com/auth/fitness.heart_rate.read',
+                    'https://www.googleapis.com/auth/fitness.sleep.read',
+                    'https://www.googleapis.com/auth/fitness.body.temperature.read',
+                    'https://www.googleapis.com/auth/fitness.body.oxygen.read'
+                ],
+                webClientId: this.CLIENT_ID,
+                offlineAccess: true
+            });
+        }
+    }
 
     async requestPermissions(): Promise<boolean> {
-        if (Platform.OS !== 'android') {
-            console.log('Google Fit is only available on Android');
+        if (Platform.OS === 'web') {
+            console.log('Native Health Service is not available on web');
+            return false;
+        }
+
+        if (!this.CLIENT_ID) {
+            console.error('Google Fit client ID is missing');
             return false;
         }
 
         try {
-            const options: AuthorizeOptions = {
-                scopes: [
-                    Scopes.FITNESS_ACTIVITY_READ,
-                    Scopes.FITNESS_BODY_READ,
-                    Scopes.FITNESS_HEART_RATE_READ,
-                    Scopes.FITNESS_SLEEP_READ,
-                    Scopes.FITNESS_BODY_TEMPERATURE_READ,
-                ],
-            };
-            const response = await GoogleFit.authorize(options);
-            this.isAuthorized = response.success;
-            return response.success;
+            console.log('Requesting Google Sign-In...');
+            await GoogleSignin.signIn();
+            const tokens = await GoogleSignin.getTokens();
+            
+            if (tokens.accessToken) {
+                console.log('Successfully signed in with Google');
+                this.isAuthorized = true;
+                return true;
+            } else {
+                console.error('Failed to get access token');
+                return false;
+            }
         } catch (error) {
             console.error('Error requesting health permissions:', error);
             return false;
@@ -61,7 +86,7 @@ class HealthService {
     }
 
     async getHealthData(): Promise<Partial<HealthData>> {
-        if (!this.isAuthorized || Platform.OS !== 'android') {
+        if (!this.isAuthorized || Platform.OS === 'web') {
             return {};
         }
 
@@ -74,11 +99,13 @@ class HealthService {
                 steps,
                 heartRate,
                 sleep,
+                oxygenSaturation,
                 activity
             ] = await Promise.all([
                 this.getSteps(startDate, endDate),
                 this.getHeartRate(startDate, endDate),
                 this.getSleepHours(startDate, endDate),
+                this.getOxygenSaturation(startDate, endDate),
                 this.getActivityMinutes(startDate, endDate)
             ]);
 
@@ -86,7 +113,7 @@ class HealthService {
                 steps,
                 heartRate,
                 sleep,
-                oxygenSaturation: 0, // Not available in Google Fit
+                oxygenSaturation,
                 meditation: 0, // Not available in Google Fit
                 activity
             };
@@ -124,17 +151,60 @@ class HealthService {
         }
     }
 
+    private async getOxygenSaturation(startDate: Date, endDate: Date): Promise<number> {
+        try {
+            const options: StartAndEndDate = {
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+            };
+            const data = await GoogleFit.getOxygenSaturationSamples(options);
+            if (data && data.length > 0) {
+                // Get the most recent reading
+                const latestReading = data[data.length - 1];
+                console.log('Oxygen saturation data:', latestReading);
+                return Math.round(latestReading.value);
+            }
+            console.log('No oxygen saturation data available');
+            return 0;
+        } catch (error) {
+            console.error('Error fetching oxygen saturation:', error);
+            return 0;
+        }
+    }
+
     private async getSleepHours(startDate: Date, endDate: Date): Promise<number> {
         try {
             const options: StartAndEndDate = {
                 startDate: startDate.toISOString(),
                 endDate: endDate.toISOString(),
             };
-            const sleepData = await GoogleFit.getSleepSamples(options) as SleepResponse[];
-            const totalMinutes = sleepData.reduce((acc: number, curr) => {
-                return acc + (new Date(curr.endDate).getTime() - new Date(curr.startDate).getTime()) / (1000 * 60);
-            }, 0);
-            return Math.round(totalMinutes / 60 * 10) / 10; // Round to 1 decimal place
+            // Try to get sleep data from multiple sources
+            const [sleepData, sleepStages] = await Promise.all([
+                GoogleFit.getSleepSamples(options),
+                GoogleFit.getSleepStages(options)
+            ]);
+
+            let totalMinutes = 0;
+
+            // Calculate from sleep samples
+            if (sleepData && sleepData.length > 0) {
+                console.log('Sleep samples data:', sleepData);
+                totalMinutes += sleepData.reduce((acc: number, curr) => {
+                    return acc + (new Date(curr.endDate).getTime() - new Date(curr.startDate).getTime()) / (1000 * 60);
+                }, 0);
+            }
+
+            // Add sleep stages if available
+            if (sleepStages && sleepStages.length > 0) {
+                console.log('Sleep stages data:', sleepStages);
+                totalMinutes += sleepStages.reduce((acc: number, curr) => {
+                    return acc + (new Date(curr.endDate).getTime() - new Date(curr.startDate).getTime()) / (1000 * 60);
+                }, 0);
+            }
+
+            const hours = Math.round((totalMinutes / 60) * 10) / 10; // Convert to hours and round to 1 decimal
+            console.log('Total sleep hours:', hours);
+            return hours;
         } catch (error) {
             console.error('Error fetching sleep data:', error);
             return 0;

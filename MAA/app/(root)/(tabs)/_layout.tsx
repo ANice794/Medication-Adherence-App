@@ -43,12 +43,12 @@ export default function TabsLayout() {
                 }}
             >
                 <Tabs.Screen 
-                    name="index" 
+                    name="profile" 
                     options={{
-                        title: 'Home',
+                        title: 'Profile',
                         tabBarIcon: ({ color, focused }) => (
                             <Ionicons 
-                                name={focused ? 'home' : 'home-outline'} 
+                                name={focused ? 'person' : 'person-outline'} 
                                 color={color} 
                                 size={24} 
                             />
@@ -69,12 +69,12 @@ export default function TabsLayout() {
                     }}
                 />
                 <Tabs.Screen 
-                    name="profile" 
+                    name="index" 
                     options={{
-                        title: 'Profile',
+                        title: 'Home',
                         tabBarIcon: ({ color, focused }) => (
                             <Ionicons 
-                                name={focused ? 'person' : 'person-outline'} 
+                                name={focused ? 'home' : 'home-outline'} 
                                 color={color} 
                                 size={24} 
                             />

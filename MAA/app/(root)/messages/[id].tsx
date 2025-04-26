@@ -1,43 +1,77 @@
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../../context/UserContext';
+import { chatService, Message } from '../../../services/chatService';
+import axios from 'axios';
+import { API_URL } from '../../../config';
 
-interface Message {
+interface ChatDetails {
     id: string;
-    text: string;
-    sender: string;
-    timestamp: string;
+    doctor: string;
+    patient: string;
 }
-
-// Mock data - in a real app, this would come from your backend
-const mockMessages: { [key: string]: Message[] } = {
-    '1': [
-        { id: '1', text: 'Hello! How are you feeling today?', sender: 'Dr. Sarah Johnson', timestamp: '10:30 AM' },
-        { id: '2', text: 'I\'m doing well, thanks for asking!', sender: 'user', timestamp: '10:31 AM' },
-        { id: '3', text: 'Have you been taking your medications as prescribed?', sender: 'Dr. Sarah Johnson', timestamp: '10:31 AM' },
-        { id: '4', text: 'Yes, I\'ve been following the schedule exactly.', sender: 'user', timestamp: '10:32 AM' },
-    ],
-    '2': [
-        { id: '1', text: 'Your prescription is ready for pickup at the pharmacy.', sender: 'Pharmacy Support', timestamp: '9:00 AM' },
-        { id: '2', text: 'Thanks! I\'ll pick it up today.', sender: 'user', timestamp: '9:05 AM' },
-    ],
-    '3': [
-        { id: '1', text: 'Great progress on your medication adherence!', sender: 'Health Coach Mike', timestamp: 'Yesterday' },
-        { id: '2', text: 'Thank you! The reminders really help.', sender: 'user', timestamp: 'Yesterday' },
-    ],
-};
 
 const ChatDetail = () => {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const { firstName } = useUser();
+    const { id: userId } = useUser();
     const [newMessage, setNewMessage] = useState('');
-    const messages = mockMessages[id as string] || [];
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [doctorId, setDoctorId] = useState<string | null>(null);
+    const flatListRef = useRef<FlatList>(null);
+
+    useEffect(() => {
+        console.log('[ChatDetail] Component mounted with chat ID:', id);
+        loadChatDetails();
+        loadMessages();
+        // Set up polling for new messages
+        console.log('[ChatDetail] Setting up message polling');
+        const interval = setInterval(loadMessages, 5000); // Poll every 5 seconds
+        return () => {
+            console.log('[ChatDetail] Cleaning up polling interval');
+            clearInterval(interval);
+        };
+    }, [id]);
+
+    const loadChatDetails = async () => {
+        console.log('[ChatDetail] Loading chat details for chat:', id);
+        try {
+            const response = await axios.get<ChatDetails>(`${API_URL}/chats/details/${id}`);
+            if (!response.data.doctor) {
+                console.error('[ChatDetail] No doctor found for chat:', id);
+                throw new Error('No doctor found for this chat');
+            }
+            console.log('[ChatDetail] Successfully loaded chat details. Doctor ID:', response.data.doctor);
+            setDoctorId(response.data.doctor);
+            return response.data.doctor;
+        } catch (err) {
+            console.error('[ChatDetail] Error loading chat details:', err);
+            setError('Failed to load chat details');
+            return null;
+        }
+    };
+
+    const loadMessages = async () => {
+        console.log('[ChatDetail] Loading messages for chat:', id);
+        try {
+            const fetchedMessages = await chatService.getMessages(id as string);
+            console.log('[ChatDetail] Successfully loaded messages:', fetchedMessages.length);
+            setMessages(fetchedMessages);
+            setError(null);
+        } catch (err) {
+            console.error('[ChatDetail] Error loading messages:', err);
+            setError('Failed to load messages');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderMessage = ({ item }: { item: Message }) => {
-        const isUser = item.sender === 'user';
+        const isUser = item.sender_id === userId.toString();
         return (
             <View style={[
                 styles.messageContainer,
@@ -51,21 +85,58 @@ const ChatDetail = () => {
                         styles.messageText,
                         isUser ? styles.userMessageText : styles.otherMessageText
                     ]}>
-                        {item.text}
+                        {item.content}
                     </Text>
                 </View>
-                <Text style={styles.timestamp}>{item.timestamp}</Text>
+                <Text style={styles.timestamp}>
+                    {new Date(item.sent_at).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    })}
+                </Text>
             </View>
         );
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (newMessage.trim().length === 0) return;
         
-        // In a real app, you would send this to your backend
-        console.log('Sending message:', newMessage);
-        setNewMessage('');
+        try {
+            let currentDoctorId = doctorId;
+            if (!currentDoctorId) {
+                console.log('[ChatDetail] Doctor ID not found, attempting to load chat details');
+                currentDoctorId = await loadChatDetails();
+                if (!currentDoctorId) {
+                    console.error('[ChatDetail] Could not determine doctor for chat:', id);
+                    throw new Error('Could not determine doctor for this chat');
+                }
+            }
+
+            const message = {
+                sender_id: userId.toString(),
+                receiver_id: currentDoctorId,
+                content: newMessage.trim(),
+                parent_message_id: undefined
+            };
+
+            console.log('[ChatDetail] Attempting to send message:', message);
+            await chatService.sendMessage(id as string, message);
+            console.log('[ChatDetail] Message sent successfully');
+            setNewMessage('');
+            loadMessages(); // Reload messages to show the new one
+        } catch (err) {
+            console.error('[ChatDetail] Error sending message:', err);
+            setError('Failed to send message');
+        }
     };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4A90E2" />
+            </View>
+        );
+    }
 
     return (
         <>
@@ -83,17 +154,27 @@ const ChatDetail = () => {
                         <Ionicons name="arrow-back" size={24} color="#333" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>
-                        {messages[0]?.sender === 'user' ? messages[1]?.sender : messages[0]?.sender}
+                        {messages[0]?.sender_id === userId.toString() 
+                            ? 'Chat' 
+                            : 'Chat'}
                     </Text>
                 </View>
 
+                {error && (
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                )}
+
                 <FlatList
+                    ref={flatListRef}
                     data={messages}
                     renderItem={renderMessage}
                     keyExtractor={item => item.id}
                     style={styles.messagesList}
                     inverted={false}
                     contentContainerStyle={styles.messagesContainer}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
                 />
 
                 <View style={styles.inputContainer}>
@@ -121,6 +202,11 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -136,6 +222,17 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: '#333',
+    },
+    errorContainer: {
+        padding: 10,
+        backgroundColor: '#ffebee',
+        marginHorizontal: 16,
+        marginTop: 8,
+        borderRadius: 8,
+    },
+    errorText: {
+        color: '#c62828',
+        textAlign: 'center',
     },
     messagesList: {
         flex: 1,
